@@ -22,7 +22,7 @@ deb: build-all
 	scripts/build-deb.sh --version $(VERSION) --arch arm64
 
 docker:
-	docker build --build-arg VERSION=$(VERSION) -t docker.io/dgzin01/farol-guard:$(VERSION) .
+	docker build --build-arg VERSION=$(VERSION) -t ghcr.io/dgolveira/farol-guard:$(VERSION) .
 
 tidy:
 	$(DOCKER_GO) go mod tidy

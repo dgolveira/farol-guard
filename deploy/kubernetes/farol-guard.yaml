@@ -64,7 +64,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: farol-guard
-          image: docker.io/dgzin01/farol-guard:0.2.1
+          image: ghcr.io/dgolveira/farol-guard:0.2.2
           args: ["ui", "--no-open", "--listen", "0.0.0.0:7380"]
           envFrom:
             - secretRef:

@@ -35,7 +35,9 @@ Commands:
   init      Create a sample inventory at the default path
   hosts     List hosts from the inventory
   check     Audit hosts and write a report (html, json or md)
-  ui        Start the local web dashboard
+  ui        Start the local web dashboard (foreground)
+  open      Start the dashboard in the background if needed and open the browser
+  stop      Stop the background dashboard
   keys      Manage SSH keys: generate, deploy, rotate, remove
   version   Print version
 
@@ -58,6 +60,10 @@ func main() {
 		err = cmdCheck(os.Args[2:])
 	case "ui":
 		err = cmdUI(os.Args[2:])
+	case "open":
+		err = cmdOpen(os.Args[2:])
+	case "stop":
+		err = cmdStop(os.Args[2:])
 	case "keys":
 		err = cmdKeys(os.Args[2:])
 	case "version", "--version", "-v":

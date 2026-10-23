@@ -1,10 +1,8 @@
-# farol-guard
+# Container image
 
-Agentless SSH auditor for Debian and Ubuntu server fleets: users, keys, sshd,
-updates, CVEs and resources, with a local dashboard and safe SSH key rotation.
+The image is published on GitHub Container Registry:
+`ghcr.io/dgolveira/farol-guard` (public, no login needed to pull).
 
-- Source, documentation and issues: <https://github.com/dgolveira/farol-guard>
-- License: MIT
 - Platforms: `linux/amd64`, `linux/arm64`
 - Base image: `gcr.io/distroless/static-debian12:nonroot` (single static binary, no shell)
 
@@ -12,15 +10,16 @@ updates, CVEs and resources, with a local dashboard and safe SSH key rotation.
 
 | Tag | Content |
 | --- | --- |
-| `0.2.1`, `latest` | current release |
+| `<version>` (e.g. `0.2.2`) | a release |
+| `latest` | the most recent release |
 
-Use the version tag in production. `0.2.0` is not published here; it was built
-with vulnerable Go and `x/crypto` versions.
+Use the version tag in production. Images up to `0.2.1` were also pushed to
+Docker Hub (`dgzin01/farol-guard`); that location is no longer updated.
 
 ## Quick start
 
 ```bash
-docker run --rm docker.io/dgzin01/farol-guard:0.2.1 version
+docker run --rm ghcr.io/dgolveira/farol-guard:0.2.2 version
 ```
 
 Run the dashboard with your inventory, state and SSH key mounted:
@@ -37,7 +36,7 @@ docker run -d --name farol-guard \
   -v "$PWD/config:/config" \
   -v "$PWD/data:/data" \
   -v "$HOME/.ssh:/home/farol/.ssh:ro" \
-  docker.io/dgzin01/farol-guard:0.2.1 ui --no-open --listen 0.0.0.0:7380
+  ghcr.io/dgolveira/farol-guard:0.2.2 ui --no-open --listen 0.0.0.0:7380
 
 docker logs farol-guard    # prints the URL with the session token
 ```
@@ -48,7 +47,7 @@ One-off audit that writes a report:
 docker run --rm --user "$(id -u):$(id -g)" \
   -v "$PWD/config:/config" -v "$PWD/data:/data" \
   -v "$HOME/.ssh:/home/farol/.ssh:ro" \
-  docker.io/dgzin01/farol-guard:0.2.1 check -o /data/report.html
+  ghcr.io/dgolveira/farol-guard:0.2.2 check -o /data/report.html
 ```
 
 ## Volumes and paths

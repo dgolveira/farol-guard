@@ -28,8 +28,14 @@ you are done:
 ```bash
 farol init                      # creates ~/.config/farol-guard/inventory.yaml
 $EDITOR ~/.config/farol-guard/inventory.yaml
-farol check                     # or: farol ui
+farol check                     # or: farol open
 ```
+
+`farol open` (also the **farol-guard** icon in the applications menu when the
+`.deb` is installed) starts the dashboard in the background if needed and opens
+the browser. `farol stop` stops it; `farol ui` runs it in the foreground. The
+session token is kept in `~/.config/farol-guard/ui-token`, so the address does
+not change between restarts.
 
 `defaults.identity` points to the private key to use (`~/.ssh/id_ed25519` by
 default). If the key has a passphrase, load it in `ssh-agent` first
