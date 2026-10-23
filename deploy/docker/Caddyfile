@@ -1,0 +1,16 @@
+{$FAROL_GUARD_DOMAIN} {
+	encode zstd gzip
+
+	basic_auth {
+		{$FAROL_GUARD_BASIC_USER} {$FAROL_GUARD_BASIC_HASH}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	reverse_proxy farol-guard:7380 {
+		header_up X-Forwarded-Proto {scheme}
+	}
+}

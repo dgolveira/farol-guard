@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=farol-guard
+GenericName=Server fleet auditor
+Comment=Audit Linux servers over SSH: users, keys, sshd, updates, CVEs and resources
+Exec=farol ui
+Icon=farol-guard
+Terminal=true
+Categories=System;Network;Security;
+Keywords=ssh;audit;cve;security;server;fleet;

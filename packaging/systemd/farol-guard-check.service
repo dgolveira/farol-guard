@@ -1,0 +1,8 @@
+[Unit]
+Description=farol-guard scheduled fleet audit
+Documentation=https://github.com/dgolveira/farol-guard
+
+[Service]
+Type=oneshot
+EnvironmentFile=-%h/.config/farol-guard/check.env
+ExecStart=/usr/bin/farol check -q -o %h/.local/share/farol-guard/latest.html

@@ -1,0 +1,7 @@
+.cache/
+dist/
+farol-report-*
+*.local.yaml
+test/lab/inventory.yaml
+*.bak
+*.tmp

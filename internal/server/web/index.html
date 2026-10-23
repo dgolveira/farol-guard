@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>farol-guard</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<script src="/theme.js"></script>
+<link rel="stylesheet" href="/assets/report.css">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="ambient"></div>
+<nav class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#/">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M10 3h4l1 4H9l1-4Z M9 9h6l1.6 12H7.4L9 9Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M3 6.5 7 7.5M21 6.5 17 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span>farol-guard</span>
+    </a>
+    <div class="nav-links">
+      <a href="#/" data-route="fleet" data-i18n="ui.nav.fleet">Fleet</a>
+      <a href="#/inventory" data-route="inventory" data-i18n="ui.nav.inventory">Inventory</a>
+      <a href="#/reports" data-route="reports" data-i18n="ui.nav.reports">Reports</a>
+      <a href="#/keys" data-route="keys" data-i18n="ui.nav.keys">Keys</a>
+    </div>
+    <div class="nav-tools">
+      <button class="ghost small" id="theme-toggle" type="button"></button>
+      <button class="ghost small" id="lang-toggle" type="button">PT</button>
+    </div>
+  </div>
+</nav>
+<main class="wrap app" id="view"></main>
+<dialog id="dialog"></dialog>
+<script src="/app.js"></script>
+</body>
+</html>

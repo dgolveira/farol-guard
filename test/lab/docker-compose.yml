@@ -1,0 +1,17 @@
+services:
+  debian12:
+    build: { context: ., args: { BASE: docker.io/library/debian:12 } }
+    image: farol-lab:debian12
+    ports: ["127.0.0.1:2201:22"]
+    environment: { LAB_WEAK_SSHD: "1" }
+    volumes: ["../../.cache/lab/authorized_keys:/lab/authorized_keys:ro"]
+  ubuntu2404:
+    build: { context: ., args: { BASE: docker.io/library/ubuntu:24.04 } }
+    image: farol-lab:ubuntu2404
+    ports: ["127.0.0.1:2202:22"]
+    volumes: ["../../.cache/lab/authorized_keys:/lab/authorized_keys:ro"]
+  ubuntu2204:
+    build: { context: ., args: { BASE: docker.io/library/ubuntu:22.04 } }
+    image: farol-lab:ubuntu2204
+    ports: ["127.0.0.1:2203:22"]
+    volumes: ["../../.cache/lab/authorized_keys:/lab/authorized_keys:ro"]

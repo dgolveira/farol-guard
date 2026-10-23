@@ -1,0 +1,43 @@
+# farol-guard inventory
+# Settings cascade: defaults -> group -> host.
+
+defaults:
+  user: root
+  port: 22
+  identity: ~/.ssh/id_ed25519
+
+# Public keys you recognize. Authorized keys found on servers are labeled with
+# these names; anything not listed is reported as unknown.
+# Get a fingerprint with: ssh-keygen -lf ~/.ssh/id_ed25519.pub
+known_keys:
+  - name: my-default-key
+    fingerprint: SHA256:REPLACE_ME
+
+thresholds:
+  disk_warn: 80
+  disk_crit: 90
+  inode_warn: 80
+  inode_crit: 90
+  mem_warn: 85
+  mem_crit: 95
+  swap_warn: 50
+  load_warn: 1.5
+  load_crit: 3
+  cpu_warn: 90
+  failed_logins_warn: 100
+  apt_lists_max_days: 7
+
+groups:
+  production:
+    hosts:
+      - name: web01
+        address: 203.0.113.10
+      - name: db01
+        address: 203.0.113.20
+        port: 2222
+        tags: [database]
+  lab:
+    user: ubuntu
+    hosts:
+      - name: lab01
+        address: 192.0.2.50

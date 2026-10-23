@@ -1,0 +1,12 @@
+[Unit]
+Description=farol-guard dashboard (local web UI)
+Documentation=https://github.com/dgolveira/farol-guard
+
+[Service]
+Type=simple
+EnvironmentFile=-%h/.config/farol-guard/ui.env
+ExecStart=/usr/bin/farol ui --no-open
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

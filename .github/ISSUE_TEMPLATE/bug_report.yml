@@ -1,0 +1,45 @@
+name: Bug report
+description: Something does not work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Do not paste hostnames, IP addresses, keys or
+        report contents from real servers. For security issues, follow SECURITY.md instead.
+  - type: input
+    id: version
+    attributes:
+      label: farol-guard version
+      description: Output of `farol version`
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run it
+      options: [".deb package", "container image", "built from source"]
+    validations:
+      required: true
+  - type: input
+    id: targets
+    attributes:
+      label: Target systems
+      description: Distributions and versions of the audited servers
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened and what did you expect
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Commands or dashboard actions. The test lab (test/lab) is ideal for reproductions.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Output of `farol check -v` or the dashboard activity log, with sensitive data removed.
+      render: text

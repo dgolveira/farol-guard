@@ -1,0 +1,237 @@
+{{define "summary"}}{{$s := .Summary}}
+<section class="bento">
+  <div class="card wide reveal" style="--i:1"><h3>{{t "report.hosts"}}</h3><div class="stat">{{$s.Reachable}}<small>/ {{$s.Hosts}} {{t "report.reachable"}}</small></div></div>
+  <div class="card wide reveal" style="--i:2"><h3>{{t "sev.critical"}} + {{t "sev.high"}}</h3><div class="stat{{if or $s.Critical $s.High}} alert{{end}}">{{$s.Critical}}<small>{{t "sev.critical"}}</small> {{$s.High}}<small>{{t "sev.high"}}</small></div></div>
+  <div class="card reveal" style="--i:3"><h3>{{t "sev.medium"}}</h3><div class="stat">{{$s.Medium}}</div></div>
+  <div class="card reveal" style="--i:4"><h3>{{t "report.secupdates"}}</h3><div class="stat">{{$s.SecUpdates}}</div></div>
+  <div class="card reveal" style="--i:5"><h3>{{t "report.cvefix"}}</h3><div class="stat">{{$s.CVEFix}}</div></div>
+</section>
+{{end}}
+
+{{define "fleet"}}{{$r := .Report}}
+<section class="reveal" style="--i:6">
+  <div class="section-head"><h2>{{t "report.fleet"}}</h2></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>{{t "report.host"}}</th><th>{{t "report.group"}}</th><th>{{t "report.os"}}</th><th>{{t "report.status"}}</th><th class="num">{{t "report.updates"}}</th><th class="num">{{t "report.cves"}}</th><th class="num">{{t "report.disk"}}</th><th class="num">{{t "report.mem"}}</th><th class="num">{{t "report.load"}}</th><th></th></tr></thead>
+    <tbody>
+    {{range $r.Hosts}}
+      <tr>
+        <td><span class="dot {{if .Reachable}}{{worst .}}{{else if .HostKey}}medium{{else}}critical{{end}}"></span><a href="{{if $.UI}}#/host/{{.Name}}{{else}}#{{hostID .}}{{end}}">{{.Name}}</a><div class="meta mono">{{.Address}}:{{.Port}}</div></td>
+        <td>{{.Group}}</td>
+        <td>{{if .Reachable}}{{.OS.Pretty}}{{else}}&mdash;{{end}}</td>
+        <td>{{if .Reachable}}<span class="badge {{worst .}}">{{sev (worst .)}}</span>{{else if .HostKey}}<span class="badge medium">{{t "report.untrusted"}}</span>{{else}}<span class="badge critical">{{t "report.unreachable"}}</span>{{end}}</td>
+        <td class="num">{{if .Reachable}}{{len .Upgrades}}{{if secup .}} <span class="lvl-critical">({{secup .}})</span>{{end}}{{end}}</td>
+        <td class="num">{{if .Reachable}}{{fixable .}}{{end}}</td>
+        <td class="num">{{if .Reachable}}<span class="lvl-{{level (maxdisk .) $r.Limits.DiskWarn $r.Limits.DiskCrit}}">{{pct (maxdisk .)}}</span>{{end}}</td>
+        <td class="num">{{if .Reachable}}<span class="lvl-{{level .Memory.UsedPct $r.Limits.MemWarn $r.Limits.MemCrit}}">{{pct .Memory.UsedPct}}</span>{{end}}</td>
+        <td class="num">{{if .Reachable}}<span class="lvl-{{level (perCore .CPU) $r.Limits.LoadWarn $r.Limits.LoadCrit}}">{{f2 .CPU.Load5}}</span>{{end}}</td>
+        <td class="num"><a class="detail-btn" href="{{if $.UI}}#/host/{{.Name}}{{else}}#{{hostID .}}{{end}}">{{t "report.details"}}</a></td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table></div>
+</section>
+{{end}}
+
+{{define "host"}}{{$r := .R}}{{with .H}}{{$h := .}}
+<section class="host"{{if not $.Modal}} id="{{hostID .}}"{{end}}>
+  <div class="host-head">
+    <h2>{{.Name}}</h2>
+    {{if .Reachable}}<span class="badge {{worst .}}">{{sev (worst .)}}</span>{{else if .HostKey}}<span class="badge medium">{{t "report.untrusted"}}</span>{{else}}<span class="badge critical">{{t "report.unreachable"}}</span>{{end}}
+  </div>
+  <div class="meta mono">{{.User}}@{{.Address}}:{{.Port}} &middot; {{.Group}}{{range .Tags}} &middot; {{.}}{{end}}</div>
+
+  <ul class="findings">
+  {{range .Findings}}
+    <li><span><span class="badge {{.Severity}}">{{sev .Severity}}</span></span><span class="cat">{{.Category}}</span><span>{{.Title}}{{if .Details}}<ul class="finding-details">{{range .Details}}<li>{{.}}</li>{{end}}</ul>{{end}}</span></li>
+  {{else}}
+    <li><span><span class="badge ok">{{t "report.ok"}}</span></span><span class="cat"></span><span>{{t "report.none"}}</span></li>
+  {{end}}
+  </ul>
+
+  {{if .Reachable}}
+  <div class="facts">
+    <div class="fact"><div class="k">{{t "f.hostname"}}</div><div class="v mono">{{.Hostname}}</div></div>
+    <div class="fact"><div class="k">{{t "report.os"}}</div><div class="v">{{.OS.Pretty}}</div></div>
+    <div class="fact"><div class="k">{{t "f.kernel"}}</div><div class="v mono">{{.Kernel}}</div></div>
+    <div class="fact"><div class="k">{{t "f.uptime"}}</div><div class="v">{{dur .UptimeSeconds}}</div></div>
+    <div class="fact"><div class="k">{{t "f.cpu"}}</div><div class="v">{{.CPU.Cores}} &middot; load {{f2 .CPU.Load1}} / {{f2 .CPU.Load5}} / {{f2 .CPU.Load15}} &middot; {{pct .CPU.UsagePct}}</div></div>
+    <div class="fact"><div class="k">{{t "f.memory"}}</div><div class="v">{{pct .Memory.UsedPct}} {{t "c.used"}} &middot; {{kb .Memory.TotalKB}}</div></div>
+    <div class="fact"><div class="k">{{t "f.swap"}}</div><div class="v">{{if .Memory.SwapTotalKB}}{{pct .Memory.SwapPct}} &middot; {{kb .Memory.SwapTotalKB}}{{else}}&mdash;{{end}}</div></div>
+    <div class="fact"><div class="k">{{t "f.eol"}}</div><div class="v">{{if .OS.EOL}}{{.OS.EOL}}{{else}}&mdash;{{end}}</div></div>
+    <div class="fact"><div class="k">{{t "f.packages"}}</div><div class="v">{{len .Packages}}</div></div>
+    <div class="fact"><div class="k">{{t "f.reboot"}}</div><div class="v">{{yesno .Reboot}}</div></div>
+    <div class="fact"><div class="k">{{t "f.unattended"}}</div><div class="v">{{yesno .Unattended}}</div></div>
+    <div class="fact"><div class="k">{{t "f.privileged"}}</div><div class="v">{{yesno .Privileged}}</div></div>
+  </div>
+
+  <div class="blocks">
+    <details>
+      <summary><span class="label">{{t "sec.users"}}<span class="count">{{len .Users}}</span></span></summary>
+      <div class="body"><div class="table-wrap"><table>
+        <thead><tr><th>{{t "c.user"}}</th><th class="num">UID</th><th>{{t "c.shell"}}</th><th>{{t "c.password"}}</th><th>{{t "c.flags"}}</th><th class="num">{{t "c.keys"}}</th></tr></thead>
+        <tbody>{{range .Users}}<tr>
+          <td>{{.Name}}</td><td class="num">{{.UID}}</td><td class="mono">{{.Shell}}</td><td>{{.PasswordState}}</td>
+          <td>{{if .Root}}<span class="badge high">{{t "t.root"}}</span> {{end}}{{if .Sudo}}<span class="badge medium">{{t "t.sudo"}}</span> {{end}}{{if .NoPasswdSudo}}<span class="badge medium">{{t "t.nopasswd"}}</span> {{end}}{{if not .CanLogin}}<span class="badge">{{t "t.nologin"}}</span>{{end}}</td>
+          <td class="num">{{len .Keys}}</td>
+        </tr>{{end}}</tbody>
+      </table></div></div>
+    </details>
+
+    <details>
+      <summary><span class="label">{{t "sec.keys"}}<span class="count">{{countKeys .Users}}</span></span></summary>
+      <div class="body"><div class="table-wrap"><table>
+        <thead><tr><th>{{t "c.user"}}</th><th>{{t "c.type"}}</th><th>{{t "c.fingerprint"}}</th><th>{{t "c.label"}}</th><th>{{t "c.comment"}}</th></tr></thead>
+        <tbody>{{range .Users}}{{range .Keys}}<tr>
+          <td>{{.User}}</td><td class="mono">{{.Type}}</td><td class="mono wrap-any">{{.Fingerprint}}</td>
+          <td>{{if eq .Farol "this"}}<span class="badge ok">{{t "t.farol.this"}}</span>{{else if eq .Farol "this-retired"}}<span class="badge medium">{{t "t.farol.retired"}}</span>{{else if eq .Farol "other"}}<span class="badge medium">{{t "t.farol.other" .FarolHost}}</span>{{else if .Label}}<span class="badge ok">{{.Label}}</span>{{else}}<span class="badge low">{{t "t.unknown"}}</span>{{end}}</td>
+          <td class="mono">{{.Comment}}{{if .Options}}<div class="meta">{{.Options}}</div>{{end}}</td>
+        </tr>{{end}}{{end}}</tbody>
+      </table></div></div>
+    </details>
+
+    <details>
+      <summary><span class="label">{{t "sec.ssh"}}<span class="count">{{if .SSHD.Effective}}{{t "t.effective"}}{{else}}{{t "t.files"}}{{end}}</span></span></summary>
+      <div class="body">
+        <div class="table-wrap"><table>
+          <thead><tr><th>{{t "c.setting"}}</th><th>{{t "c.value"}}</th></tr></thead>
+          <tbody>{{range sshdKeys}}{{$v := $h.SSHD.Get .}}{{if $v}}<tr><td class="mono">{{.}}</td><td class="mono wrap-any">{{$v}}</td></tr>{{end}}{{end}}</tbody>
+        </table></div>
+        {{if .SSHD.Version}}<p class="note mono">{{.SSHD.Version}}</p>{{end}}
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="label">{{t "sec.updates"}}<span class="count">{{len .Upgrades}}</span></span></summary>
+      <div class="body">{{if .Upgrades}}<div class="table-wrap"><table>
+        <thead><tr><th>{{t "c.package"}}</th><th>{{t "c.current"}}</th><th>{{t "c.new"}}</th><th>{{t "c.suite"}}</th></tr></thead>
+        <tbody>{{range .Upgrades}}<tr><td>{{.Name}}{{if .Security}} <span class="badge high">security</span>{{end}}</td><td class="mono">{{.OldVersion}}</td><td class="mono">{{.NewVersion}}</td><td class="mono">{{.Suite}}</td></tr>{{end}}</tbody>
+      </table></div>{{else}}<p class="note">{{t "report.none"}}</p>{{end}}</div>
+    </details>
+
+    <details>
+      <summary><span class="label">{{t "sec.cves"}}<span class="count">{{len .Vulns}}</span></span></summary>
+      <div class="body">{{if .FixAll}}<p class="note" style="margin:0 0 8px">{{t "t.fixall"}}</p><pre class="pre" style="margin-bottom:16px">{{.FixAll}}</pre>{{end}}{{if .Vulns}}<div class="table-wrap"><table class="cve-table">
+        <colgroup><col style="width:17%"><col style="width:23%"><col style="width:22%"><col></colgroup>
+        <thead><tr><th>CVE</th><th>{{t "c.package"}}</th><th>{{t "c.fix"}}</th><th>{{t "c.summary"}}</th></tr></thead>
+        <tbody>{{range limit 150 .Vulns}}<tr>
+          <td><a class="mono cve-id" href="https://osv.dev/vulnerability/{{.ID}}" target="_blank" rel="noopener noreferrer">{{.ID}}</a>
+            <div class="cve-sev"><span class="badge {{.Severity}}">{{sev .Severity}}</span>{{if .Score}}<span class="meta mono">{{.Score}}</span>{{end}}</div></td>
+          <td class="mono"><div class="cve-pkg">{{.Package}}</div><div class="meta">{{.Version}}</div><div class="cve-to">&rarr; {{if .Fixed}}{{.Fixed}}{{else}}<span class="meta">{{t "t.unfixed"}}</span>{{end}}</div></td>
+          <td>{{if .Fixed}}{{if .Candidate}}<span class="badge ok">{{t "t.inapt"}}</span>{{else}}<span class="badge low">{{t "t.notinapt"}}</span>{{end}}{{if .Binaries}}<div class="mono fix-cmd">apt-get install --only-upgrade{{range .Binaries}} <span class="nowrap">{{.}}</span>{{end}}</div>{{end}}{{end}}</td>
+          <td class="cve-summary">{{if .Details}}<details class="cve-more" title="{{.Details}}"><summary>{{.Details}}</summary></details>{{else}}{{.Summary}}{{end}}</td>
+        </tr>{{end}}</tbody>
+      </table></div>{{if gt (len .Vulns) 150}}<p class="note">{{t "t.more" (rest 150 (len .Vulns))}}</p>{{end}}{{else}}<p class="note">{{t "report.none"}}</p>{{end}}</div>
+    </details>
+
+    <details>
+      <summary><span class="label">{{t "sec.access"}}<span class="count">{{len .IPs}}</span></span></summary>
+      <div class="body">{{if .IPs}}<div class="table-wrap"><table>
+        <thead><tr><th>IP</th><th>{{t "c.users"}}</th><th>{{t "c.keys"}}</th><th class="num">{{t "c.accepted"}}</th><th class="num">{{t "c.failed"}}</th><th>{{t "c.last"}}</th></tr></thead>
+        <tbody>{{range limit 100 .IPs}}<tr>
+          <td class="mono">{{.IP}}</td>
+          <td><div class="chips">{{range limit 8 .Users}}<span class="chip">{{.}}</span>{{end}}</div></td>
+          <td><div class="chips">{{range .Keys}}<span class="chip">{{.}}</span>{{end}}</div></td>
+          <td class="num">{{.Accepted}}</td><td class="num{{if .Failed}} lvl-medium{{end}}">{{.Failed}}</td><td class="mono">{{.Last}}</td>
+        </tr>{{end}}</tbody>
+      </table></div>{{else}}<p class="note">{{t "report.none"}}</p>{{end}}
+      {{if .LastRaw}}<h3 style="margin:24px 0 10px">last</h3><pre class="pre">{{range limit 30 .LastRaw}}{{.}}
+{{end}}</pre>{{end}}</div>
+    </details>
+
+    <details>
+      <summary><span class="label">{{t "sec.lastlogins"}}<span class="count">{{len .Logins}}</span></span></summary>
+      <div class="body">{{if .Logins}}<div class="table-wrap"><table>
+        <thead><tr><th>{{t "c.time"}}</th><th>{{t "c.user"}}</th><th>IP</th><th>{{t "c.method"}}</th><th>{{t "c.key"}}</th></tr></thead>
+        <tbody>{{range limit 40 .Logins}}<tr><td class="mono">{{.Time}}</td><td>{{.User}}</td><td class="mono">{{.IP}}</td><td class="mono">{{.Method}}</td><td class="mono wrap-any">{{if .KeyLabel}}<span class="badge ok">{{.KeyLabel}}</span>{{else}}{{.Fingerprint}}{{end}}</td></tr>{{end}}</tbody>
+      </table></div>{{else}}<p class="note">{{t "report.none"}}</p>{{end}}</div>
+    </details>
+
+    <details>
+      <summary><span class="label">{{t "sec.network"}}<span class="count">{{len .Interfaces}}</span></span></summary>
+      <div class="body"><div class="table-wrap"><table>
+        <thead><tr><th>{{t "c.iface"}}</th><th>{{t "c.state"}}</th><th>{{t "c.addrs"}}</th><th class="num">{{t "c.errors"}} rx/tx</th><th class="num">{{t "c.drops"}} rx/tx</th></tr></thead>
+        <tbody>{{range .Interfaces}}<tr><td class="mono">{{.Name}}</td><td>{{.State}}</td><td class="mono">{{join .Addrs " "}}</td><td class="num">{{.RxErrs}} / {{.TxErrs}}</td><td class="num">{{.RxDrop}} / {{.TxDrop}}</td></tr>{{end}}</tbody>
+      </table></div>
+      <div class="facts">
+        <div class="fact"><div class="k">{{t "f.firewall"}}</div><div class="v mono">{{join .Firewall " | "}}</div></div>
+        <div class="fact"><div class="k">{{t "f.fail2ban"}}</div><div class="v mono">{{if .Fail2ban}}{{join (limit 3 .Fail2ban) " "}}{{else}}&mdash;{{end}}</div></div>
+        <div class="fact"><div class="k">{{t "f.timesync"}}</div><div class="v">{{if .TimeSync}}{{.TimeSync}}{{else}}&mdash;{{end}}</div></div>
+      </div>
+      {{if .KernelErr}}<h3 style="margin:24px 0 10px">{{t "sec.kernelerr"}}</h3><pre class="pre">{{range limit 60 .KernelErr}}{{.}}
+{{end}}</pre>{{end}}</div>
+    </details>
+
+    <details>
+      <summary><span class="label">{{t "sec.resources"}}<span class="count">{{len .Disks}}</span></span></summary>
+      <div class="body"><div class="table-wrap"><table>
+        <thead><tr><th>{{t "c.mount"}}</th><th>{{t "c.type"}}</th><th class="num">{{t "c.size"}}</th><th class="num">{{t "c.used"}}</th><th class="num">{{t "c.inodes"}}</th></tr></thead>
+        <tbody>{{range .Disks}}<tr><td class="mono">{{.Mount}}<div class="meta">{{.Filesystem}}</div></td><td class="mono">{{.Type}}</td><td class="num">{{bytes .Size}}</td><td class="num"><span class="lvl-{{level .UsedPct $r.Limits.DiskWarn $r.Limits.DiskCrit}}">{{pct .UsedPct}}</span></td><td class="num"><span class="lvl-{{level .InodePct $r.Limits.DiskWarn $r.Limits.DiskCrit}}">{{pct .InodePct}}</span></td></tr>{{end}}</tbody>
+      </table></div></div>
+    </details>
+
+    <details>
+      <summary><span class="label">{{t "sec.apps"}}<span class="count">{{len .Services}}</span></span></summary>
+      <div class="body">
+        {{if .Containers}}<h3 style="margin:0 0 10px">{{t "t.containers"}}</h3><div class="table-wrap"><table>
+          <thead><tr><th>{{t "c.name"}}</th><th>{{t "c.image"}}</th><th>{{t "c.state"}}</th></tr></thead>
+          <tbody>{{range .Containers}}<tr><td class="mono">{{.Name}}</td><td class="mono wrap-any">{{.Image}}</td><td>{{.Status}}</td></tr>{{end}}</tbody>
+        </table></div>{{end}}
+        {{if .Snaps}}<h3 style="margin:24px 0 10px">{{t "t.snaps"}}</h3><div class="table-wrap"><table>
+          <thead><tr><th>{{t "c.name"}}</th><th>{{t "c.version"}}</th><th>{{t "c.channel"}}</th></tr></thead>
+          <tbody>{{range .Snaps}}<tr><td class="mono">{{.Name}}</td><td class="mono">{{.Version}}</td><td class="mono">{{.Channel}}</td></tr>{{end}}</tbody>
+        </table></div>{{end}}
+        <h3 style="margin:24px 0 10px">{{t "t.services"}}</h3>
+        <div class="chips">{{range .Services}}<span class="chip">{{.}}</span>{{end}}</div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="label">{{t "sec.listening"}}<span class="count">{{len .Listening}}</span></span></summary>
+      <div class="body"><div class="table-wrap"><table>
+        <thead><tr><th>{{t "c.proto"}}</th><th>{{t "c.address"}}</th><th>{{t "c.process"}}</th></tr></thead>
+        <tbody>{{range .Listening}}<tr><td class="mono">{{.Proto}}</td><td class="mono">{{.Address}}</td><td class="mono">{{.Process}}</td></tr>{{end}}</tbody>
+      </table></div></div>
+    </details>
+  </div>
+  {{end}}
+</section>
+{{end}}{{end}}
+
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>farol-guard {{t "report.title"}}</title>
+{{if .BackURL}}<script src="/theme.js"></script>{{end}}
+<style>{{.Style}}</style>
+</head>
+<body>
+<div class="ambient"></div>
+<main class="wrap">
+{{if .BackURL}}<a class="back-link" href="{{.BackURL}}">&larr; {{t "ui.back.dashboard"}}</a>{{end}}
+{{$r := .Report}}{{$s := .Summary}}
+<header class="reveal">
+  <div class="eyebrow">farol-guard {{$r.Version}}</div>
+  <h1>{{t "report.title"}}</h1>
+  <div class="meta">{{t "report.generated"}} {{time $r.GeneratedAt}}{{if not $r.CVEChecked}} &middot; {{t "report.cvedisabled"}}{{end}}</div>
+</header>
+
+{{template "summary" .}}
+
+<div id="fleet"></div>
+{{template "fleet" .}}
+
+{{range $r.Hosts}}<div class="host-modal" id="{{hostID .}}" role="dialog" aria-label="{{.Name}}">
+  <a class="modal-backdrop" href="#fleet" aria-hidden="true" tabindex="-1"></a>
+  <div class="host-panel">
+    <a class="modal-close" href="#fleet" aria-label="{{t "ui.close"}}">&times;</a>
+    {{template "host" (dict "H" . "R" $r "Modal" true)}}
+  </div>
+</div>{{end}}
+
+<footer><span>farol-guard {{$r.Version}}</span><span>{{time $r.GeneratedAt}}</span></footer>
+</main>
+</body>
+</html>

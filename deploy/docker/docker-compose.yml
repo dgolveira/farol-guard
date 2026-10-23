@@ -1,0 +1,49 @@
+services:
+  farol-guard:
+    image: ghcr.io/dgolveira/farol-guard:0.2.0
+    build:
+      context: ../..
+    user: "${UID:-1000}:${GID:-1000}"
+    env_file: .env
+    command: ["ui", "--no-open", "--listen", "0.0.0.0:7380"]
+    ports:
+      - "127.0.0.1:7380:7380"
+    volumes:
+      - ./config:/config
+      - ./data:/data
+      - ${HOME}/.ssh:/home/farol/.ssh:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+  proxy:
+    profiles: ["proxy"]
+    image: docker.io/library/caddy:2.8.4
+    env_file: .env
+    depends_on: [farol-guard]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+
+volumes:
+  caddy-data:
+  caddy-config:
