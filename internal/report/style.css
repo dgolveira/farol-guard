@@ -209,3 +209,26 @@ details.cve-more > summary::after { content: none; }
 details.cve-more > summary:hover { color: var(--ink); }
 details.cve-more:not([open]) > summary { mask-image: linear-gradient(to bottom, #000 70%, transparent); -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent); }
 details.cve-more[open] > summary { display: block; -webkit-line-clamp: unset; }
+.fix-panel { margin: 0 0 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.fix-panel > summary { padding: 10px 14px; font-weight: 600; color: var(--ink); }
+.fix-body { padding: 0 14px 14px; display: grid; gap: 8px; }
+.fix-risk { background: var(--yellow-bg); color: var(--yellow); border-radius: 8px; padding: 12px 14px; font-size: 13px; line-height: 1.55; }
+.fix-risk ul { margin: 6px 0 0; padding-left: 18px; }
+.fix-risk li { margin: 2px 0; }
+.fix-risk .fix-warn { color: var(--red); font-weight: 600; }
+.fix-label { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.fix-cmdbox { position: relative; }
+.fix-cmdbox .fix-copy { position: absolute; top: 6px; right: 6px; padding: 4px 10px; font-size: 12px; }
+.fix-cmdbox .fix-code { padding-right: 80px; }
+@media print { .fix-panel { display: none; } }
+.finding-details .detail-id { color: var(--ink-2); }
+.finding-details .detail-id:hover { color: var(--ink); }
+.finding-details .detail-desc { display: block; margin: 2px 0 6px; font: 12px/1.55 var(--sans); color: var(--muted); }
+details.more-list, details.more-list:first-of-type { border: 0; }
+details.more-list > summary { display: inline-flex; padding: 4px 0 0; font: 500 12px var(--sans); color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+details.more-list > summary::after { content: none; }
+details.more-list > summary:hover { color: var(--ink); }
+details.more-list > .finding-details { margin-top: 4px; }
+details.more-list .when-open, details.more-list[open] .when-closed { display: none; }
+details.more-list[open] .when-open { display: inline; }
+@media print { details.more-list > summary { display: none; } details.more-list > .finding-details { display: grid; } }

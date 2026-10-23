@@ -332,8 +332,9 @@ async function loadFleet() {
   const gen = r.headers.get("X-Report-Generated");
   document.getElementById("report-meta").innerHTML =
     `${esc(t("ui.lastreport", fmtTime(gen)))} &middot; <a href="/api/reports/${esc(id)}?format=html&${langParam()}">HTML</a>
-     &middot; <a href="/api/reports/${esc(id)}?format=json&download=1">JSON</a>
-     &middot; <a href="/api/reports/${esc(id)}?format=md&download=1&${langParam()}">Markdown</a>`;
+     &middot; <a data-download href="/api/reports/${esc(id)}?format=html&download=1&${langParam()}">${esc(t("ui.dl.html"))}</a>
+     &middot; <a data-download href="/api/reports/${esc(id)}?format=json&download=1">JSON</a>
+     &middot; <a data-download href="/api/reports/${esc(id)}?format=md&download=1&${langParam()}">Markdown</a>`;
 }
 
 async function loadPendingKeys() {
@@ -424,6 +425,10 @@ async function renderHost(name) {
     box.innerHTML = await r.text();
     const sec = box.querySelector(".host");
     if (sec) sec.style.paddingTop = "48px";
+    box.querySelectorAll(".fix-panel > summary").forEach(s => s.addEventListener("click", ev => {
+      ev.preventDefault();
+      fixDialog(s.parentElement.querySelector(".fix-body"));
+    }));
   };
   bindRunner(load);
   await load();
@@ -806,8 +811,9 @@ async function renderReports() {
       <td class="num">${m.medium}</td>
       <td><div class="actions">
         <a class="btn ghost small" href="/api/reports/${esc(m.id)}?format=html&from=reports&${langParam()}">HTML</a>
-        <a class="btn ghost small" href="/api/reports/${esc(m.id)}?format=json&download=1">JSON</a>
-        <a class="btn ghost small" href="/api/reports/${esc(m.id)}?format=md&download=1&${langParam()}">MD</a>
+        <a class="btn ghost small" data-download href="/api/reports/${esc(m.id)}?format=html&download=1&${langParam()}" title="${esc(t("ui.dl.html"))}">HTML &darr;</a>
+        <a class="btn ghost small" data-download href="/api/reports/${esc(m.id)}?format=json&download=1">JSON</a>
+        <a class="btn ghost small" data-download href="/api/reports/${esc(m.id)}?format=md&download=1&${langParam()}">MD</a>
         <button class="danger small" data-del="${esc(m.id)}">${esc(t("ui.inv.delete"))}</button>
       </div></td>
     </tr>`).join("");
@@ -1067,6 +1073,38 @@ async function renderKeys() {
   view.querySelectorAll("[data-remove]").forEach(b => b.addEventListener("click", () => removeDialog(data.fleet[Number(b.dataset.remove)])));
 }
 
+function fixDialog(body) {
+  dialog.innerHTML = `<div class="dlg dlg-wide"><h2>${esc(t("fix.title"))}</h2><div class="fix-body fix-modal"></div>
+    <div class="foot"><button type="button" id="fix-close">${esc(t("ui.close"))}</button></div></div>`;
+  const box = dialog.querySelector(".fix-modal");
+  box.innerHTML = body.innerHTML;
+  box.querySelectorAll(".fix-code").forEach(pre => {
+    const wrap = document.createElement("div");
+    wrap.className = "fix-cmdbox";
+    pre.replaceWith(wrap);
+    wrap.appendChild(pre);
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "ghost fix-copy";
+    b.textContent = t("fix.copy");
+    b.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(pre.textContent);
+        toast(t("fix.copied"));
+      } catch (e) {
+        const range = document.createRange();
+        range.selectNodeContents(pre);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    });
+    wrap.appendChild(b);
+  });
+  dialog.showModal();
+  document.getElementById("fix-close").addEventListener("click", () => dialog.close());
+}
+
 function alertBox(msg) {
   dialog.innerHTML = `<div class="dlg"><div class="notice err">${esc(msg)}</div><div class="foot"><button id="alert-ok">${esc(t("ui.close"))}</button></div></div>`;
   dialog.showModal();
@@ -1317,6 +1355,68 @@ function startConnWatch() {
   window.addEventListener("focus", checkBackend);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) checkBackend(); });
 }
+
+function toast(msg, kind = "ok") {
+  let box = document.getElementById("toasts");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "toasts";
+    box.setAttribute("role", "status");
+    box.setAttribute("aria-live", "polite");
+    document.body.appendChild(box);
+  }
+  const el = document.createElement("div");
+  el.className = "toast " + kind;
+  el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 300); }, 6000);
+}
+
+const saveTypes = {
+  json: { description: "JSON", accept: { "application/json": [".json"] } },
+  md: { description: "Markdown", accept: { "text/markdown": [".md"] } },
+  html: { description: "HTML", accept: { "text/html": [".html"] } },
+};
+
+async function downloadReport(a) {
+  const r = await fetch(a.href, { credentials: "same-origin", cache: "no-store" });
+  if (!r.ok) throw new Error(r.statusText);
+  const cd = r.headers.get("Content-Disposition") || "";
+  const m = cd.match(/filename="([^"]+)"/);
+  const name = m ? m[1] : "farol-report";
+  const ext = name.split(".").pop();
+  const blob = await r.blob();
+  if (window.showSaveFilePicker) {
+    let handle;
+    try {
+      handle = await window.showSaveFilePicker({ suggestedName: name, types: saveTypes[ext] ? [saveTypes[ext]] : undefined });
+    } catch (e) {
+      if (e.name === "AbortError") return;
+      throw e;
+    }
+    const w = await handle.createWritable();
+    await w.write(blob);
+    await w.close();
+    toast(t("ui.dl.saved", handle.name || name));
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const tmp = document.createElement("a");
+  tmp.href = url;
+  tmp.download = name;
+  document.body.appendChild(tmp);
+  tmp.click();
+  tmp.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  toast(t("ui.dl.started", name));
+}
+
+document.addEventListener("click", ev => {
+  const a = ev.target.closest && ev.target.closest("a[data-download]");
+  if (!a) return;
+  ev.preventDefault();
+  downloadReport(a).catch(e => toast(t("ui.error", e.message), "err"));
+});
 
 const themes = ["auto", "light", "dark"];
 

@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"net/url"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/dgolveira/farol-guard/internal/i18n"
 	"github.com/dgolveira/farol-guard/internal/model"
@@ -21,6 +24,28 @@ var htmlTmpl string
 var Style string
 
 type Format string
+
+var advisoryID = regexp.MustCompile(`^(CVE|GHSA|USN|DSA|DLA|DTSA|UBUNTU|DEBIAN|PYSEC|GO|OSV)-[0-9A-Za-z.:-]+$`)
+
+func detailHTML(s string) template.HTML {
+	var b strings.Builder
+	for i, p := range strings.Split(s, " · ") {
+		esc := template.HTMLEscapeString(p)
+		long := utf8.RuneCountInString(p) > 100 && !strings.HasPrefix(p, "apt-get ")
+		if i > 0 && !long {
+			b.WriteString(" · ")
+		}
+		switch {
+		case i == 0 && advisoryID.MatchString(p):
+			fmt.Fprintf(&b, `<a class="detail-id" href="https://osv.dev/vulnerability/%s" target="_blank" rel="noopener noreferrer">%s</a>`, url.PathEscape(p), esc)
+		case long:
+			fmt.Fprintf(&b, `<span class="detail-desc">%s</span>`, esc)
+		default:
+			b.WriteString(esc)
+		}
+	}
+	return template.HTML(b.String())
+}
 
 const (
 	HTML     Format = "html"
@@ -113,6 +138,23 @@ func Funcs(lang string) template.FuncMap {
 				return 0
 			}
 			return c.Load5 / float64(c.Cores)
+		},
+		"detail": detailHTML,
+		"dcount": func(d []string) int {
+			n := len(d)
+			if n > 0 && strings.HasPrefix(d[n-1], "+") {
+				var extra int
+				if _, err := fmt.Sscanf(d[n-1], "+%d", &extra); err == nil {
+					return n - 1 + extra
+				}
+			}
+			return n
+		},
+		"after": func(n int, v []string) []string {
+			if len(v) <= n {
+				return nil
+			}
+			return v[n:]
 		},
 		"limit": func(n int, v any) any {
 			switch s := v.(type) {

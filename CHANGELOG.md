@@ -6,6 +6,34 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-23
+
+### Fixed
+
+- Report downloads (HTML, JSON, Markdown) now open the native "Save as" dialog
+  where the browser supports it, so they work visibly inside the app window,
+  which does not show the browser download bar. Other browsers fall back to a
+  normal download. A notice confirms the saved file.
+- The scope picker on the fleet view opened behind the summary cards, and a
+  stray "-" marker showed under it.
+
+### Added
+
+- "Download HTML" next to JSON and Markdown in the fleet view and report history.
+- Fix commands panel in the CVE section of each host: a single command that
+  upgrades every package with a fixed CVE (non-interactive, keeps modified
+  config files), a simulation command, an alternative covering all pending
+  security updates, and post-upgrade checks (services to restart, pending
+  reboot, failed units). A risk notice comes first and flags packages that
+  usually need a restart or reboot and fixes missing from the apt lists. The
+  dashboard opens it as a modal with copy buttons; the static HTML report shows
+  it as an expandable block. The JSON report gains `fix_plan`.
+- Findings for high/critical CVEs without a fix, pending and security updates
+  and kernel errors now list the items behind the count (CVE, package, severity
+  and summary; package and versions; log lines). Advisory IDs link to OSV,
+  and lists with more than two items are collapsed behind "Show details".
+
+
 ## [1.0.1] - 2026-10-23
 
 ### Fixed

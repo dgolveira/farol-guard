@@ -186,16 +186,16 @@ func system(a adder, h *model.HostReport, t inventory.Thresholds, now time.Time)
 		a.add(model.SevLow, "system", "time_unsynced")
 	}
 	if len(h.KernelErr) > 0 {
-		a.add(model.SevLow, "system", "kernel_errors", len(h.KernelErr))
+		a.addDetailed(model.SevLow, "system", "kernel_errors", capped(h.KernelErr), len(h.KernelErr))
 	}
 }
 
 func updates(a adder, h *model.HostReport, t inventory.Thresholds) {
 	if sec := h.SecurityUpgrades(); sec > 0 {
-		a.add(model.SevHigh, "updates", "security_updates", sec)
+		a.addDetailed(model.SevHigh, "updates", "security_updates", upgradeDetails(h.Upgrades, true), sec)
 	}
 	if n := len(h.Upgrades) - h.SecurityUpgrades(); n > 0 {
-		a.add(model.SevLow, "updates", "pending_updates", n)
+		a.addDetailed(model.SevLow, "updates", "pending_updates", upgradeDetails(h.Upgrades, false), n)
 	}
 	if h.AptListsAge > t.AptListsMaxDays {
 		a.add(model.SevLow, "updates", "apt_lists_stale", int(h.AptListsAge))
@@ -205,7 +205,7 @@ func updates(a adder, h *model.HostReport, t inventory.Thresholds) {
 	}
 }
 
-const maxDetails = 12
+const maxDetails = 40
 
 func upgradeCommand(binaries []string) string {
 	return "apt-get install --only-upgrade " + strings.Join(binaries, " ")
@@ -238,14 +238,99 @@ func annotateVulns(h *model.HostReport) {
 		}
 	}
 	h.FixAll = ""
-	if len(fixAll) > 0 {
-		all := make([]string, 0, len(fixAll))
-		for b := range fixAll {
-			all = append(all, b)
-		}
-		sort.Strings(all)
-		h.FixAll = upgradeCommand(all)
+	h.Fix = nil
+	if len(fixAll) == 0 {
+		return
 	}
+	all := make([]string, 0, len(fixAll))
+	for b := range fixAll {
+		all = append(all, b)
+	}
+	sort.Strings(all)
+	h.FixAll = upgradeCommand(all)
+	h.Fix = fixPlan(h, all)
+}
+
+var sensitivePrefixes = []string{"linux-image", "linux-modules", "linux-headers", "libc6", "libc-bin", "systemd", "libsystemd", "openssl", "libssl", "openssh-server", "dbus", "libdbus", "docker", "containerd", "runc", "kubelet", "kubeadm", "grub"}
+
+func isSensitive(pkg string) bool {
+	for _, p := range sensitivePrefixes {
+		if strings.HasPrefix(pkg, p) {
+			return true
+		}
+	}
+	return false
+}
+
+const aptNonInteractive = "sudo env DEBIAN_FRONTEND=noninteractive apt-get install --only-upgrade -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold "
+
+func fixPlan(h *model.HostReport, pkgs []string) *model.FixPlan {
+	p := &model.FixPlan{Packages: pkgs}
+	for _, b := range pkgs {
+		if isSensitive(b) {
+			p.Sensitive = append(p.Sensitive, b)
+		}
+	}
+	for _, v := range h.Vulns {
+		if v.Fixed != "" && v.Candidate == "" {
+			p.NotInApt++
+		}
+	}
+	list := strings.Join(pkgs, " ")
+	p.Command = "sudo apt-get update && " + aptNonInteractive + list
+	p.Simulate = "sudo apt-get update && apt-get -s install --only-upgrade " + list
+	seen := map[string]bool{}
+	for _, u := range h.Upgrades {
+		if u.Security && !seen[u.Name] {
+			seen[u.Name] = true
+			p.Security = append(p.Security, u.Name)
+		}
+	}
+	sort.Strings(p.Security)
+	if len(p.Security) > 0 {
+		p.SecurityCommand = "sudo apt-get update && " + aptNonInteractive + strings.Join(p.Security, " ")
+	}
+	p.After = []string{
+		"command -v needrestart >/dev/null && sudo needrestart -r l",
+		"[ -f /var/run/reboot-required ] && cat /var/run/reboot-required.pkgs || echo 'no reboot required'",
+		"systemctl --failed",
+	}
+	return p
+}
+
+func capped(lines []string) []string {
+	if len(lines) <= maxDetails {
+		return lines
+	}
+	return append(append([]string{}, lines[:maxDetails]...), fmt.Sprintf("+%d", len(lines)-maxDetails))
+}
+
+func upgradeDetails(list []model.Upgrade, security bool) []string {
+	var out []string
+	for _, u := range list {
+		if u.Security == security {
+			out = append(out, fmt.Sprintf("%s %s → %s (%s)", u.Name, u.OldVersion, u.NewVersion, u.Suite))
+		}
+	}
+	return capped(out)
+}
+
+func unfixedDetails(list []model.Vuln) []string {
+	out := make([]string, 0, len(list))
+	for _, v := range list {
+		line := fmt.Sprintf("%s · %s %s · %s", v.ID, v.Package, v.Version, strings.ToUpper(v.Severity))
+		if v.Score > 0 {
+			line += fmt.Sprintf(" %.1f", v.Score)
+		}
+		if sum := strings.TrimSpace(v.Summary); sum != "" {
+			if r := []rune(sum); len(r) > 1000 {
+				sum = string(r[:1000]) + "…"
+			}
+			line += " · " + sum
+		}
+		out = append(out, line)
+	}
+	return capped(out)
 }
 
 func vulnDetails(list []model.Vuln) []string {
@@ -267,11 +352,11 @@ func vulnDetails(list []model.Vuln) []string {
 func vulns(a adder, h *model.HostReport) {
 	annotateVulns(h)
 	var crit, high, other []model.Vuln
-	unfixed := 0
+	var unfixed []model.Vuln
 	for _, v := range h.Vulns {
 		if v.Fixed == "" {
 			if v.Rank() >= 3 {
-				unfixed++
+				unfixed = append(unfixed, v)
 			}
 			continue
 		}
@@ -293,8 +378,8 @@ func vulns(a adder, h *model.HostReport) {
 	if len(other) > 0 {
 		a.addDetailed(model.SevMedium, "cve", "cve_other_fixable", vulnDetails(other), len(other))
 	}
-	if unfixed > 0 {
-		a.add(model.SevInfo, "cve", "cve_unfixed", unfixed)
+	if len(unfixed) > 0 {
+		a.addDetailed(model.SevInfo, "cve", "cve_unfixed", unfixedDetails(unfixed), len(unfixed))
 	}
 	for _, b := range h.VulnBulk {
 		a.add(model.SevInfo, "cve", "cve_bulk", b.Package, b.Version, b.Count)

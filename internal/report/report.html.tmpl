@@ -43,7 +43,7 @@
 
   <ul class="findings">
   {{range .Findings}}
-    <li><span><span class="badge {{.Severity}}">{{sev .Severity}}</span></span><span class="cat">{{.Category}}</span><span>{{.Title}}{{if .Details}}<ul class="finding-details">{{range .Details}}<li>{{.}}</li>{{end}}</ul>{{end}}</span></li>
+    <li><span><span class="badge {{.Severity}}">{{sev .Severity}}</span></span><span class="cat">{{.Category}}</span><span>{{.Title}}{{if .Details}}{{if le (len .Details) 2}}<ul class="finding-details">{{range .Details}}<li>{{detail .}}</li>{{end}}</ul>{{else}}<details class="more-list"><summary><span class="when-closed">{{t "t.showmore" (dcount .Details)}}</span><span class="when-open">{{t "t.showless"}}</span></summary><ul class="finding-details">{{range .Details}}<li>{{detail .}}</li>{{end}}</ul></details>{{end}}{{end}}</span></li>
   {{else}}
     <li><span><span class="badge ok">{{t "report.ok"}}</span></span><span class="cat"></span><span>{{t "report.none"}}</span></li>
   {{end}}
@@ -111,7 +111,21 @@
 
     <details>
       <summary><span class="label">{{t "sec.cves"}}<span class="count">{{len .Vulns}}</span></span></summary>
-      <div class="body">{{if .FixAll}}<p class="note" style="margin:0 0 8px">{{t "t.fixall"}}</p><pre class="pre" style="margin-bottom:16px">{{.FixAll}}</pre>{{end}}{{if .Vulns}}<div class="table-wrap"><table class="cve-table">
+      <div class="body">{{with .Fix}}<details class="fix-panel">
+        <summary><span class="fix-open">{{t "fix.open"}}</span></summary>
+        <div class="fix-body">
+          <div class="fix-risk"><strong>{{t "fix.risk.title"}}</strong><ul>
+            <li>{{t "fix.risk.restart"}}</li><li>{{t "fix.risk.reboot"}}</li><li>{{t "fix.risk.deps"}}</li><li>{{t "fix.risk.test"}}</li><li>{{t "fix.risk.never"}}</li>
+            {{if .Sensitive}}<li class="fix-warn">{{t "fix.sensitive" (join .Sensitive ", ")}}</li>{{end}}
+            {{if .NotInApt}}<li class="fix-warn">{{t "fix.notinapt" .NotInApt}}</li>{{end}}
+          </ul></div>
+          <p class="fix-label">{{t "fix.simulate"}}</p><pre class="pre fix-code">{{.Simulate}}</pre>
+          <p class="fix-label">{{t "fix.single" (len .Packages)}}</p><pre class="pre fix-code">{{.Command}}</pre>
+          {{if .SecurityCommand}}<p class="fix-label">{{t "fix.security" (len .Security)}}</p><pre class="pre fix-code">{{.SecurityCommand}}</pre>{{end}}
+          <p class="fix-label">{{t "fix.after"}}</p><pre class="pre fix-code">{{join .After "\n"}}</pre>
+          <p class="note">{{t "fix.perpkg"}}</p>
+        </div>
+      </details>{{end}}{{if .Vulns}}<div class="table-wrap"><table class="cve-table">
         <colgroup><col style="width:17%"><col style="width:23%"><col style="width:22%"><col></colgroup>
         <thead><tr><th>CVE</th><th>{{t "c.package"}}</th><th>{{t "c.fix"}}</th><th>{{t "c.summary"}}</th></tr></thead>
         <tbody>{{range limit 150 .Vulns}}<tr>

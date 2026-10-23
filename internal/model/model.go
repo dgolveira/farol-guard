@@ -106,6 +106,17 @@ type Package struct {
 	SourceVersion string `json:"source_version"`
 }
 
+type FixPlan struct {
+	Packages        []string `json:"packages"`
+	Sensitive       []string `json:"sensitive,omitempty"`
+	NotInApt        int      `json:"not_in_apt,omitempty"`
+	Security        []string `json:"security_packages,omitempty"`
+	Command         string   `json:"command"`
+	Simulate        string   `json:"simulate"`
+	SecurityCommand string   `json:"security_command,omitempty"`
+	After           []string `json:"after"`
+}
+
 type Upgrade struct {
 	Name       string `json:"name"`
 	Suite      string `json:"suite"`
@@ -265,6 +276,7 @@ type HostReport struct {
 
 	Vulns    []Vuln     `json:"vulns,omitempty"`
 	FixAll   string     `json:"fix_all_command,omitempty"`
+	Fix      *FixPlan   `json:"fix_plan,omitempty"`
 	VulnBulk []VulnBulk `json:"vuln_bulk,omitempty"`
 	Findings []Finding  `json:"findings,omitempty"`
 }

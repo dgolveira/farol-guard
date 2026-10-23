@@ -34,7 +34,7 @@ button.small, .btn.small { padding: 5px 10px; font-size: 13px; }
 :root[data-theme="dark"] button:not(.ghost):not(.danger):hover { background: #D4D4D2; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) button:not(.ghost):not(.danger):hover { background: #D4D4D2; border-color: #D4D4D2; } }
 
-.runner { display: grid; grid-template-columns: 1fr auto; gap: 20px 24px; align-items: end; }
+.runner { position: relative; z-index: 5; display: grid; grid-template-columns: 1fr auto; gap: 20px 24px; align-items: end; }
 .runner .opts { display: flex; flex-wrap: wrap; gap: 16px 28px; align-items: end; }
 label.field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); min-width: 0; }
 label.check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-2); cursor: pointer; }
@@ -162,7 +162,7 @@ button.is-busy { cursor: progress; }
 dialog .grid2 { grid-template-columns: 1fr 1fr; }
 .scope-pop { position: relative; min-width: 240px; border: 0; }
 .scope-pop > summary { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 0; font-weight: 400; cursor: pointer; }
-.scope-pop > summary::after { content: none; }
+.scope-pop > summary::after, .scope-pop[open] > summary::after { content: none; }
 .scope-pop > summary .meta { font-size: 12px; }
 .scope-pop-value { font: 14px var(--sans); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 9px 34px 9px 11px; min-width: 240px; position: relative; }
 .scope-pop-value::after { content: "\25BE"; position: absolute; right: 12px; color: var(--muted); }
@@ -184,3 +184,10 @@ details.scope-pop, details.scope-pop:first-of-type { border: 0; }
 .job-result { margin: 0 0 12px; font-weight: 500; }
 .job-result.notice.ok { background: var(--green-bg); color: var(--green); }
 .job-result.notice.warn { background: var(--yellow-bg); color: var(--yellow); }
+#toasts { position: fixed; right: 20px; bottom: 20px; z-index: 200; display: grid; gap: 8px; max-width: min(420px, calc(100vw - 40px)); }
+.toast { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-left: 3px solid var(--green); border-radius: 8px; padding: 12px 16px; font-size: 13.5px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.10); overflow-wrap: anywhere; animation: toast-in 250ms cubic-bezier(0.16, 1, 0.3, 1); transition: opacity 300ms ease, transform 300ms ease; }
+.toast.err { border-left-color: var(--red); }
+.toast.out { opacity: 0; transform: translateY(6px); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; transition: none; } }
+.fix-modal { padding: 0; }
