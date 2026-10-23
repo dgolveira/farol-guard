@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-23
+
+### Security
+
+- Build with Go 1.26.10 and `golang.org/x/crypto` v0.56.0. Version 0.2.0 was
+  built with Go 1.25 and `x/crypto` v0.43.0, which are affected by
+  vulnerabilities reported by govulncheck in the SSH client, `net/http`,
+  `html/template`, `crypto/tls` and `crypto/x509`. Upgrade from 0.2.0.
+
+### Added
+
+- Container image published on Docker Hub (`docker.io/dgzin01/farol-guard`),
+  multi-arch (amd64, arm64).
+
 ## [0.2.0] - 2026-10-23
 
 First public release.

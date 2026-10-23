@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.25-bookworm AS build
+FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.26-bookworm AS build
 ARG VERSION=dev
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64

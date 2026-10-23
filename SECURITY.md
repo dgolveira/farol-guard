@@ -6,8 +6,8 @@ Security fixes are released for the latest minor version.
 
 | Version | Supported |
 | --- | --- |
-| 0.2.x | yes |
-| < 0.2 | no |
+| 0.2.1 and later | yes |
+| 0.2.0 | no (built with vulnerable Go and x/crypto versions, upgrade) |
 
 ## Reporting a vulnerability
 

@@ -1,5 +1,5 @@
 VERSION ?= $(shell cat VERSION)
-GO_IMAGE ?= docker.io/library/golang:1.25-bookworm
+GO_IMAGE ?= docker.io/library/golang:1.26-bookworm
 LDFLAGS := -s -w -X main.version=$(VERSION)
 DOCKER_GO := docker run --rm -u $(shell id -u):$(shell id -g) \
 	-v $(CURDIR):/src -w /src \
@@ -22,7 +22,7 @@ deb: build-all
 	scripts/build-deb.sh --version $(VERSION) --arch arm64
 
 docker:
-	docker build --build-arg VERSION=$(VERSION) -t ghcr.io/dgolveira/farol-guard:$(VERSION) .
+	docker build --build-arg VERSION=$(VERSION) -t docker.io/dgzin01/farol-guard:$(VERSION) .
 
 tidy:
 	$(DOCKER_GO) go mod tidy
