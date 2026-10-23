@@ -81,21 +81,22 @@ para criar manualmente um usuário dedicado e restrito e a chave do app.
 **Pacote Debian / Ubuntu** (nas [releases](https://github.com/dgolveira/farol-guard/releases)):
 
 ```bash
-sudo apt install ./farol-guard_0.2.0_amd64.deb
+sudo apt install ./farol-guard_0.2.2_amd64.deb
 farol version
 ```
 
-O pacote instala o binário `farol`, um atalho no menu que abre o dashboard e
-units de usuário do systemd para a verificação diária e para o dashboard
-(desabilitadas por padrão).
+O pacote instala o binário `farol`, o ícone **farol-guard** no menu de
+aplicativos (inicia o dashboard em segundo plano e abre o navegador; com o
+botão direito há "Parar o dashboard") e units de usuário do systemd para a
+verificação diária e para o dashboard (desabilitadas por padrão).
 
-**Imagem de container:**
+**Imagem de container** ([GitHub Container Registry](https://github.com/dgolveira/farol-guard/pkgs/container/farol-guard), amd64 e arm64):
 
 ```bash
-docker run --rm ghcr.io/dgolveira/farol-guard:0.2.0 version
+docker run --rm ghcr.io/dgolveira/farol-guard:0.2.2 version
 ```
 
-**A partir do código** (Go 1.25, ou apenas Docker):
+**A partir do código** (Go 1.26, ou apenas Docker):
 
 ```bash
 git clone https://github.com/dgolveira/farol-guard.git
@@ -110,7 +111,7 @@ make deb
 farol init                                   # inventário de exemplo em ~/.config/farol-guard
 $EDITOR ~/.config/farol-guard/inventory.yaml # cadastre seus hosts
 farol check -o relatorio.html                # audita e gera o relatório
-farol ui                                     # abre o dashboard
+farol open                                   # inicia o dashboard e abre o navegador
 ```
 
 Flags úteis do `farol check`: `-g grupo`, `-H host`, `--refresh` (roda

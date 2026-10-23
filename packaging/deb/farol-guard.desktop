@@ -2,9 +2,18 @@
 Type=Application
 Name=farol-guard
 GenericName=Server fleet auditor
+GenericName[pt_BR]=Auditor de servidores
 Comment=Audit Linux servers over SSH: users, keys, sshd, updates, CVEs and resources
-Exec=farol ui
+Comment[pt_BR]=Audita servidores Linux via SSH: usuários, chaves, sshd, atualizações, CVEs e recursos
+Exec=farol open
 Icon=farol-guard
-Terminal=true
-Categories=System;Network;Security;
+Terminal=false
+StartupNotify=false
+Categories=System;Monitor;Security;
 Keywords=ssh;audit;cve;security;server;fleet;
+Actions=stop;
+
+[Desktop Action stop]
+Name=Stop dashboard
+Name[pt_BR]=Parar o dashboard
+Exec=farol stop

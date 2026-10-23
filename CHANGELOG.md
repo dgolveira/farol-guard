@@ -6,6 +6,38 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-23
+
+### Added
+
+- `farol open`: starts the dashboard in the background when it is not running
+  (through the `farol-guard-ui` systemd user unit when installed, otherwise as a
+  detached process) and opens the browser; `farol stop` stops it. The desktop
+  entry now runs `farol open` without a terminal and offers "Stop dashboard".
+- The dashboard session token is stored in `~/.config/farol-guard/ui-token`
+  (mode 600) and reused across restarts, unless `FAROL_GUARD_TOKEN` is set.
+
+### Changed
+
+- The container image is published only on GitHub Container Registry
+  (`ghcr.io/dgolveira/farol-guard`). Docker Hub (`dgzin01/farol-guard`) is no
+  longer updated after 0.2.1.
+- Desktop entry categories fixed so the icon appears once in the menu.
+
+## [0.2.1] - 2026-10-23
+
+### Security
+
+- Build with Go 1.26.10 and `golang.org/x/crypto` v0.56.0. Version 0.2.0 was
+  built with Go 1.25 and `x/crypto` v0.43.0, which are affected by
+  vulnerabilities reported by govulncheck in the SSH client, `net/http`,
+  `html/template`, `crypto/tls` and `crypto/x509`. Upgrade from 0.2.0.
+
+### Added
+
+- Container image published on Docker Hub (`ghcr.io/dgolveira/farol-guard`),
+  multi-arch (amd64, arm64).
+
 ## [0.2.0] - 2026-10-23
 
 First public release.

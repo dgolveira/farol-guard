@@ -2,8 +2,8 @@
 
 ## Requirements
 
-- Go 1.25 (or only Docker: every `make` target runs inside
-  `docker.io/library/golang:1.25-bookworm`).
+- Go 1.26 (or only Docker: every `make` target runs inside
+  `docker.io/library/golang:1.26-bookworm`).
 - Docker with the compose plugin for the test lab.
 - `dpkg-deb` to build the `.deb` packages.
 

@@ -49,7 +49,7 @@ func cmdUI(args []string) error {
 		fmt.Fprintln(os.Stderr, "         put it behind an authenticating proxy (see docs/hosting.md).")
 	}
 	if os.Getenv("FAROL_GUARD_TOKEN") == "" && (net.ParseIP(host) == nil || !net.ParseIP(host).IsLoopback()) {
-		fmt.Fprintln(os.Stderr, "WARNING: FAROL_GUARD_TOKEN is not set: a new random token is generated on every start.")
+		fmt.Fprintln(os.Stderr, "NOTE: using the session token stored in "+tokenPath()+"; set FAROL_GUARD_TOKEN to manage it as a secret.")
 	}
 
 	interactive := term.IsTerminal(int(os.Stdin.Fd()))
@@ -66,9 +66,9 @@ func cmdUI(args []string) error {
 	}
 	d.SetInteractive(false)
 
-	token := os.Getenv("FAROL_GUARD_TOKEN")
-	if token == "" {
-		token = server.NewToken()
+	token, err := uiToken()
+	if err != nil {
+		return err
 	}
 	hosts := splitList(strings.Join(allowed, ","))
 	hosts = append(hosts, splitList(os.Getenv("FAROL_GUARD_ALLOWED_HOSTS"))...)

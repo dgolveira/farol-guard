@@ -1,5 +1,5 @@
 VERSION ?= $(shell cat VERSION)
-GO_IMAGE ?= docker.io/library/golang:1.25-bookworm
+GO_IMAGE ?= docker.io/library/golang:1.26-bookworm
 LDFLAGS := -s -w -X main.version=$(VERSION)
 DOCKER_GO := docker run --rm -u $(shell id -u):$(shell id -g) \
 	-v $(CURDIR):/src -w /src \

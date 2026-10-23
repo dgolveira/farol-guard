@@ -89,23 +89,24 @@ farol (your workstation) --SSH key--> server: bash -s collector (read-only)
 **Debian / Ubuntu package** (from the [releases](https://github.com/dgolveira/farol-guard/releases)):
 
 ```bash
-sudo apt install ./farol-guard_0.2.0_amd64.deb
+sudo apt install ./farol-guard_0.2.2_amd64.deb
 farol version
 ```
 
-The package installs the `farol` binary, a desktop entry that opens the
-dashboard, and optional systemd user units for a daily check and for the
-dashboard (disabled by default).
+The package installs the `farol` binary, a **farol-guard** icon in the
+applications menu (it starts the dashboard in the background and opens the
+browser; right click offers "Stop dashboard"), and optional systemd user units
+for a daily check and for the dashboard (disabled by default).
 
-**Container image:**
+**Container image** ([GitHub Container Registry](https://github.com/dgolveira/farol-guard/pkgs/container/farol-guard), amd64 and arm64):
 
 ```bash
-docker run --rm ghcr.io/dgolveira/farol-guard:0.2.0 version
+docker run --rm ghcr.io/dgolveira/farol-guard:0.2.2 version
 ```
 
-See [deploy/docker](deploy/docker) and [hosting](docs/hosting.md).
+See [container image](docs/container.md), [deploy/docker](deploy/docker) and [hosting](docs/hosting.md).
 
-**From source** (Go 1.25, or only Docker):
+**From source** (Go 1.26, or only Docker):
 
 ```bash
 git clone https://github.com/dgolveira/farol-guard.git
@@ -120,7 +121,7 @@ make deb          # .deb packages for amd64 and arm64
 farol init                                   # sample inventory in ~/.config/farol-guard
 $EDITOR ~/.config/farol-guard/inventory.yaml # add your hosts
 farol check -o report.html                   # audit and write a report
-farol ui                                     # open the dashboard
+farol open                                   # start the dashboard and open the browser
 ```
 
 Useful flags for `farol check`: `-g group`, `-H host`, `--refresh` (runs
