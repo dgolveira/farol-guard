@@ -9,6 +9,7 @@ import (
 
 	"github.com/dgolveira/farol-guard/internal/inventory"
 	"github.com/dgolveira/farol-guard/internal/model"
+	"github.com/dgolveira/farol-guard/internal/sshx"
 )
 
 var eolDates = map[string]string{
@@ -40,7 +41,11 @@ func Host(h *model.HostReport, t inventory.Thresholds, now time.Time) {
 			a.add(model.SevMedium, "access", "host_key_untrusted", h.HostKey.Type, h.HostKey.Fingerprint)
 			return
 		}
-		a.add(model.SevHigh, "access", "host_unreachable", h.Error)
+		if reason := sshx.Reason(h.Error); reason != "" {
+			a.addDetailed(model.SevHigh, "access", "conn_"+reason, []string{h.Error}, h.Address, h.Port)
+		} else {
+			a.add(model.SevHigh, "access", "host_unreachable", h.Error)
+		}
 		return
 	}
 	if h.Error != "" {

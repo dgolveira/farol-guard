@@ -93,8 +93,12 @@ async function runnerHTML(fixedHost) {
       <label class="check"><input type="checkbox" id="opt-refresh">${esc(t("ui.refresh"))}</label>
       <label class="check"><input type="checkbox" id="opt-nocve">${esc(t("ui.nocve"))}</label>
     </div>
-    <div><button id="run-btn" type="button">${esc(t("ui.run"))}</button></div>
+    <div class="run-actions">
+      <button id="run-btn" type="button">${esc(t("ui.run"))}</button>
+      <button id="cancel-btn" class="danger" type="button" hidden>${esc(t("ui.cancel"))}</button>
+    </div>
     <div class="progress" id="progress">
+      <div class="job-result" id="job-result" hidden></div>
       <div class="meta" id="progress-text"></div>
       <div class="bar"><span id="progress-bar"></span></div>
       <div class="job-hosts" id="job-hosts"></div>
@@ -160,6 +164,14 @@ function confirmDuplicates(dups) {
 }
 
 function bindRunner(onDone) {
+  state.logNext = 0;
+  state.logJob = null;
+  const cancelBtn = document.getElementById("cancel-btn");
+  cancelBtn.addEventListener("click", async () => {
+    cancelBtn.disabled = true;
+    cancelBtn.innerHTML = `<span class="spinner" aria-hidden="true"></span>${esc(t("ui.cancelling"))}`;
+    try { await api("/api/check/cancel", { method: "POST" }); } catch (e) { showProgressError(e.message); }
+  });
   const pop = document.getElementById("scope-pop");
   let getScope = null;
   if (pop) {
@@ -221,9 +233,17 @@ function startPolling(onDone) {
     try { job = await api("/api/job?since=" + (state.logNext || 0)); } catch (e) { return; }
     const p = document.getElementById("progress");
     const btn = document.getElementById("run-btn");
+    const cancel = document.getElementById("cancel-btn");
     if (!p || !btn) { clearInterval(state.poll); return; }
-    btn.disabled = !!job.running;
+    btn.hidden = !!job.running;
+    btn.disabled = false;
+    cancel.hidden = !job.running;
+    if (!job.running) {
+      cancel.disabled = false;
+      cancel.textContent = t("ui.cancel");
+    }
     if (!job.started) return;
+    btn.textContent = t(job.running ? "ui.run" : "ui.run.again");
     p.classList.add("on");
     if (state.logJob !== job.started && state.logNext) {
       state.logNext = 0;
@@ -237,15 +257,32 @@ function startPolling(onDone) {
       frac = 0.7 + 0.3 * job.cve_done / job.cve_total;
       text += " &middot; " + esc(t("ui.cve", job.cve_done, job.cve_total));
     }
+    const result = document.getElementById("job-result");
+    const bar = document.getElementById("progress-bar");
+    bar.classList.remove("done", "cancelled");
+    result.hidden = true;
     if (!job.running) {
       frac = 1;
-      text = esc(t("ui.done", fmtTime(job.finished)));
-      if (job.error) text += ` &middot; <span class="lvl-medium">${esc(job.error)}</span>`;
+      const hosts = job.hosts || [];
+      const ok = hosts.filter(h => h.ok).length;
+      const pend = hosts.filter(h => h.pending).length;
+      const fail = hosts.length - ok - pend;
+      result.hidden = false;
+      if (job.cancelled) {
+        bar.classList.add("cancelled");
+        result.className = "job-result notice";
+        result.textContent = t("ui.done.cancelled", fmtTime(job.finished));
+      } else {
+        bar.classList.add("done");
+        result.className = "job-result notice " + (fail || job.error ? "warn" : "ok");
+        result.textContent = t("ui.done.summary", fmtTime(job.finished), hosts.length, ok, fail, pend) + (job.error ? " · " + job.error : "");
+      }
+      text = "";
     }
     document.getElementById("progress-text").innerHTML = text;
     document.getElementById("progress-bar").style.transform = `scaleX(${frac})`;
     document.getElementById("job-hosts").innerHTML = (job.hosts || []).map(h =>
-      `<span class="badge ${h.ok ? "ok" : h.pending ? "medium" : "critical"}" title="${esc(h.pending ? t("report.untrusted") : (h.error || h.os))}">${esc(h.name)}</span>`).join("");
+      `<span class="badge ${h.ok ? "ok" : h.pending ? "medium" : "critical"}" title="${esc(h.pending ? t("report.untrusted") : h.reason ? jobReason(h) : (h.error || h.os))}">${esc(h.name)}</span>`).join("");
     if (job.running) {
       state.wasRunning = true;
     } else {
@@ -718,6 +755,16 @@ async function deleteHost(name) {
   renderInventory();
 }
 
+function jobReason(h) {
+  const inv = (state.inv && state.inv.hosts || []).find(x => x.name === h.name) || {};
+  return connError(h.reason, inv.address || h.name, inv.port || 22, h.error);
+}
+
+function connError(reason, address, port, raw) {
+  if (reason && state.dict["conn_" + reason]) return t("conn_" + reason, address, port);
+  return t("ui.test.fail", raw);
+}
+
 async function testHost(name, line) {
   line.className = "status-line meta";
   line.textContent = t("ui.test.running");
@@ -740,7 +787,8 @@ async function testHost(name, line) {
       return testHost(name, line);
     }
     line.className = "status-line err";
-    line.textContent = t("ui.test.fail", r.error);
+    line.textContent = connError(r.reason, r.address, r.port, r.error);
+    line.title = r.error;
   } catch (e) {
     line.className = "status-line err";
     line.textContent = t("ui.test.fail", e.message);

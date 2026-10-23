@@ -1,6 +1,6 @@
 services:
   farol-guard:
-    image: ghcr.io/dgolveira/farol-guard:1.0.0
+    image: ghcr.io/dgolveira/farol-guard:1.0.1
     build:
       context: ../..
     user: "${UID:-1000}:${GID:-1000}"

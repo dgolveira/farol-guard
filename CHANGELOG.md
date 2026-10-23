@@ -6,6 +6,29 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-23
+
+### Fixed
+
+- Connection errors are explained in plain language (name not in DNS, port
+  refused, timeout or firewall/fail2ban, no route, key rejected, host key
+  changed, locked key, reset during handshake) in the connection test, the
+  check progress and the report findings; the raw error stays available on
+  hover and in the finding details.
+- The dashboard uses up to 1480 px of width, so the inventory table no longer
+  scrolls sideways or cuts the action buttons on wide screens and in Portuguese.
+- Switching the language during a running check no longer blanks the progress
+  and activity log; the full log and state are reloaded immediately.
+
+### Added
+
+- "Cancel check" button while a check runs: hosts not started yet are skipped,
+  running collections are interrupted and a cancelled check is not saved to the
+  history.
+- Clear end of check: the progress bar turns green, a summary shows how many
+  hosts were ok, failed or have a pending host key, and the button changes to
+  "Check again".
+
 ## [1.0.0] - 2026-10-23
 
 First stable release. The CLI flags, inventory format, report JSON fields and

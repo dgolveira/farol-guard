@@ -44,6 +44,10 @@ func Run(ctx context.Context, inv *inventory.Inventory, hosts []inventory.Host, 
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
+			if ctx.Err() != nil {
+				results[i] = &model.HostReport{Name: h.Name, Address: h.Address, Port: h.Port, User: h.User, Group: h.Group, Error: "cancelled"}
+				return
+			}
 			r := collect.Host(ctx, d, h, labels, collect.Options{RefreshApt: opts.RefreshApt, Timeout: opts.Timeout, Log: opts.Log, Pending: opts.Pending})
 			results[i] = r
 			if opts.OnHost != nil {

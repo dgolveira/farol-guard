@@ -64,23 +64,26 @@ type JobHost struct {
 	Name     string `json:"name"`
 	OK       bool   `json:"ok"`
 	Error    string `json:"error,omitempty"`
+	Reason   string `json:"reason,omitempty"`
 	OS       string `json:"os,omitempty"`
 	Duration string `json:"duration"`
 	Pending  bool   `json:"pending,omitempty"`
 }
 
 type Job struct {
-	Running  bool      `json:"running"`
-	Started  time.Time `json:"started"`
-	Finished time.Time `json:"finished,omitempty"`
-	Total    int       `json:"total"`
-	Hosts    []JobHost `json:"hosts"`
-	CVEDone  int       `json:"cve_done"`
-	CVETotal int       `json:"cve_total"`
-	Error    string    `json:"error,omitempty"`
-	ReportID string    `json:"report_id,omitempty"`
-	Log      []LogLine `json:"-"`
-	LogBase  int       `json:"-"`
+	Running   bool      `json:"running"`
+	Started   time.Time `json:"started"`
+	Finished  time.Time `json:"finished,omitempty"`
+	Total     int       `json:"total"`
+	Hosts     []JobHost `json:"hosts"`
+	CVEDone   int       `json:"cve_done"`
+	CVETotal  int       `json:"cve_total"`
+	Error     string    `json:"error,omitempty"`
+	ReportID  string    `json:"report_id,omitempty"`
+	Cancelled bool      `json:"cancelled,omitempty"`
+	Log       []LogLine `json:"-"`
+	LogBase   int       `json:"-"`
+	cancel    context.CancelFunc
 }
 
 type LogLine struct {
@@ -134,6 +137,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/hosts/status", s.handleHostStatus)
 	mux.HandleFunc("POST /api/check", s.handleStartCheck)
 	mux.HandleFunc("GET /api/job", s.handleJob)
+	mux.HandleFunc("POST /api/check/cancel", s.handleCancelCheck)
 	mux.HandleFunc("GET /api/reports", s.handleReports)
 	mux.HandleFunc("GET /api/reports/{id}", s.handleReportDownload)
 	mux.HandleFunc("DELETE /api/reports/{id}", s.handleReportDelete)
@@ -446,7 +450,7 @@ func (s *Server) handleTestHost(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, map[string]any{"ok": false, "unknown_host": true, "fingerprint": uh.Fingerprint, "type": uh.Type, "error": err.Error()})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error()})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error(), "reason": sshx.Reason(err.Error()), "address": t.Address, "port": t.Port})
 		return
 	}
 	defer client.Close()
@@ -454,7 +458,7 @@ func (s *Server) handleTestHost(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	out, _, err := sshx.Run(ctx, client, `printf '%s %s ' "$(id -un)" "$(id -u)"; if [ "$(id -u)" = 0 ] || sudo -n true 2>/dev/null; then echo privileged; else echo limited; fi; . /etc/os-release 2>/dev/null; echo "$PRETTY_NAME"`, nil)
 	if err != nil {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error()})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error(), "reason": sshx.Reason(err.Error()), "address": t.Address, "port": t.Port})
 		return
 	}
 	lines := strings.SplitN(strings.TrimSpace(string(out)), "\n", 2)
@@ -590,18 +594,18 @@ func (s *Server) handleStartCheck(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusConflict, errors.New("a check is already running"))
 		return
 	}
-	job := &Job{Running: true, Started: time.Now(), Total: len(hosts)}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	job := &Job{Running: true, Started: time.Now(), Total: len(hosts), cancel: cancel}
 	job.logf("starting check of %d hosts (apt-get update: %v, CVE lookup: %v)", len(hosts), req.Refresh, !req.NoCVE)
 	s.job = job
 	s.mu.Unlock()
 
-	go s.runJob(job, inv, hosts, req.Refresh, req.NoCVE)
+	go s.runJob(ctx, job, inv, hosts, req.Refresh, req.NoCVE)
 	writeJSON(w, http.StatusAccepted, map[string]bool{"ok": true})
 }
 
-func (s *Server) runJob(job *Job, inv *inventory.Inventory, hosts []inventory.Host, refresh, noCVE bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	defer cancel()
+func (s *Server) runJob(ctx context.Context, job *Job, inv *inventory.Inventory, hosts []inventory.Host, refresh, noCVE bool) {
+	defer job.cancel()
 	prev, _, _ := history.Latest()
 	pending := check.PendingFrom(prev, hosts)
 	rep, err := check.Run(ctx, inv, hosts, s.cfg.Dialer, check.Options{
@@ -615,7 +619,7 @@ func (s *Server) runJob(job *Job, inv *inventory.Inventory, hosts []inventory.Ho
 		},
 		OnHost: func(h *model.HostReport) {
 			s.mu.Lock()
-			job.Hosts = append(job.Hosts, JobHost{Name: h.Name, OK: h.Reachable, Error: h.Error, OS: h.OS.Pretty, Duration: h.Duration.Round(time.Millisecond).String(), Pending: h.HostKey != nil})
+			job.Hosts = append(job.Hosts, JobHost{Name: h.Name, OK: h.Reachable, Error: h.Error, Reason: sshx.Reason(h.Error), OS: h.OS.Pretty, Duration: h.Duration.Round(time.Millisecond).String(), Pending: h.HostKey != nil})
 			s.mu.Unlock()
 		},
 		OnCVE: func(done, total int) {
@@ -624,6 +628,17 @@ func (s *Server) runJob(job *Job, inv *inventory.Inventory, hosts []inventory.Ho
 			s.mu.Unlock()
 		},
 	})
+	s.mu.Lock()
+	cancelled := job.Cancelled
+	s.mu.Unlock()
+	if cancelled {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		job.Running = false
+		job.Finished = time.Now()
+		job.logf("check cancelled after %s; no report was saved", job.Finished.Sub(job.Started).Round(time.Second))
+		return
+	}
 	id, serr := history.Save(rep)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -640,6 +655,21 @@ func (s *Server) runJob(job *Job, inv *inventory.Inventory, hosts []inventory.Ho
 	if err != nil || serr != nil {
 		log.Printf("check finished with errors: %v %v", err, serr)
 	}
+}
+
+func (s *Server) handleCancelCheck(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.job == nil || !s.job.Running {
+		writeErr(w, http.StatusConflict, errors.New("no check is running"))
+		return
+	}
+	if !s.job.Cancelled {
+		s.job.Cancelled = true
+		s.job.logf("cancel requested")
+		s.job.cancel()
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {

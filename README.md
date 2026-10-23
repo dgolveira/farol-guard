@@ -89,7 +89,7 @@ farol (your workstation) --SSH key--> server: bash -s collector (read-only)
 **Debian / Ubuntu package** (from the [releases](https://github.com/dgolveira/farol-guard/releases)):
 
 ```bash
-sudo apt install ./farol-guard_1.0.0_amd64.deb
+sudo apt install ./farol-guard_1.0.1_amd64.deb
 farol version
 ```
 
@@ -101,7 +101,7 @@ for a daily check and for the dashboard (disabled by default).
 **Container image** ([GitHub Container Registry](https://github.com/dgolveira/farol-guard/pkgs/container/farol-guard), amd64 and arm64):
 
 ```bash
-docker run --rm ghcr.io/dgolveira/farol-guard:1.0.0 version
+docker run --rm ghcr.io/dgolveira/farol-guard:1.0.1 version
 ```
 
 See [container image](docs/container.md), [deploy/docker](deploy/docker) and [hosting](docs/hosting.md).
