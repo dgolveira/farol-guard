@@ -10,7 +10,7 @@ The image is published on GitHub Container Registry:
 
 | Tag | Content |
 | --- | --- |
-| `<version>` (e.g. `0.2.2`) | a release |
+| `<version>` (e.g. `1.0.0`) | a release |
 | `latest` | the most recent release |
 
 Use the version tag in production. Images up to `0.2.1` were also pushed to
@@ -19,7 +19,7 @@ Docker Hub (`dgzin01/farol-guard`); that location is no longer updated.
 ## Quick start
 
 ```bash
-docker run --rm ghcr.io/dgolveira/farol-guard:0.2.2 version
+docker run --rm ghcr.io/dgolveira/farol-guard:1.0.0 version
 ```
 
 Run the dashboard with your inventory, state and SSH key mounted:
@@ -36,7 +36,7 @@ docker run -d --name farol-guard \
   -v "$PWD/config:/config" \
   -v "$PWD/data:/data" \
   -v "$HOME/.ssh:/home/farol/.ssh:ro" \
-  ghcr.io/dgolveira/farol-guard:0.2.2 ui --no-open --listen 0.0.0.0:7380
+  ghcr.io/dgolveira/farol-guard:1.0.0 ui --no-open --listen 0.0.0.0:7380
 
 docker logs farol-guard    # prints the URL with the session token
 ```
@@ -47,7 +47,7 @@ One-off audit that writes a report:
 docker run --rm --user "$(id -u):$(id -g)" \
   -v "$PWD/config:/config" -v "$PWD/data:/data" \
   -v "$HOME/.ssh:/home/farol/.ssh:ro" \
-  ghcr.io/dgolveira/farol-guard:0.2.2 check -o /data/report.html
+  ghcr.io/dgolveira/farol-guard:1.0.0 check -o /data/report.html
 ```
 
 ## Volumes and paths

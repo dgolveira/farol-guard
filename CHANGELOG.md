@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-23
+
+First stable release. The CLI flags, inventory format, report JSON fields and
+dashboard API used by the bundled UI are considered stable from this version;
+breaking changes will only happen in a new major version.
+
+### Added
+
+- `farol open` opens the dashboard as an app window (own window, no tabs) when
+  the default browser is Chromium based (Edge, Chrome, Chromium, Brave, Vivaldi,
+  Opera), using a dedicated browser profile; closing the window stops the
+  dashboard. Other default browsers get a normal tab. `--no-app` and
+  `FAROL_GUARD_BROWSER` override the choice.
+- Presence tracking: every page served by the dashboard sends a heartbeat. When
+  started by `farol open` or the desktop icon (`--idle-exit 20s`), the dashboard
+  exits once no page has been open for 20 seconds, never during a check or a key
+  operation. `farol ui`, Docker and Kubernetes keep running unless
+  `--idle-exit`/`FAROL_GUARD_IDLE_EXIT` is set.
+- Backend status indicator in the dashboard top bar: green while the backend
+  answers, red and pulsing when the connection is lost.
+
 ## [0.2.2] - 2026-10-23
 
 ### Added

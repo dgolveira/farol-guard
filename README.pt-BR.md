@@ -81,7 +81,7 @@ para criar manualmente um usuário dedicado e restrito e a chave do app.
 **Pacote Debian / Ubuntu** (nas [releases](https://github.com/dgolveira/farol-guard/releases)):
 
 ```bash
-sudo apt install ./farol-guard_0.2.2_amd64.deb
+sudo apt install ./farol-guard_1.0.0_amd64.deb
 farol version
 ```
 
@@ -93,7 +93,7 @@ verificação diária e para o dashboard (desabilitadas por padrão).
 **Imagem de container** ([GitHub Container Registry](https://github.com/dgolveira/farol-guard/pkgs/container/farol-guard), amd64 e arm64):
 
 ```bash
-docker run --rm ghcr.io/dgolveira/farol-guard:0.2.2 version
+docker run --rm ghcr.io/dgolveira/farol-guard:1.0.0 version
 ```
 
 **A partir do código** (Go 1.26, ou apenas Docker):

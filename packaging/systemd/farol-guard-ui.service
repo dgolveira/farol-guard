@@ -4,6 +4,7 @@ Documentation=https://github.com/dgolveira/farol-guard
 
 [Service]
 Type=simple
+Environment=FAROL_GUARD_IDLE_EXIT=20s
 EnvironmentFile=-%h/.config/farol-guard/ui.env
 ExecStart=/usr/bin/farol ui --no-open
 Restart=on-failure

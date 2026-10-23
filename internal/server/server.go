@@ -41,15 +41,24 @@ type Config struct {
 	Token         string
 	Dialer        *sshx.Dialer
 	AllowedHosts  []string
+	IdleExit      time.Duration
 }
 
 type Server struct {
-	cfg  Config
-	mu   sync.Mutex
-	opMu sync.Mutex
-	job  *Job
-	http *http.Server
+	cfg        Config
+	mu         sync.Mutex
+	opMu       sync.Mutex
+	job        *Job
+	http       *http.Server
+	pagesMu    sync.Mutex
+	pages      map[string]time.Time
+	emptySince time.Time
 }
+
+const (
+	pageStale    = 150 * time.Second
+	startupGrace = 60 * time.Second
+)
 
 type JobHost struct {
 	Name     string `json:"name"`
@@ -111,6 +120,8 @@ func (s *Server) Handler() http.Handler {
 		fmt.Fprint(w, report.Style)
 	})
 	mux.HandleFunc("GET /api/meta", s.handleMeta)
+	mux.HandleFunc("GET /api/ping", s.handlePing)
+	mux.HandleFunc("POST /api/bye", s.handleBye)
 	mux.HandleFunc("GET /api/i18n", s.handleI18n)
 	mux.HandleFunc("GET /api/inventory", s.handleInventory)
 	mux.HandleFunc("GET /api/identities", s.handleIdentities)
@@ -138,7 +149,16 @@ func (s *Server) Listen() (net.Listener, error) {
 }
 
 func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	s.http = &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	if s.cfg.IdleExit > 0 {
+		s.pagesMu.Lock()
+		s.pages = map[string]time.Time{}
+		s.emptySince = time.Now().Add(startupGrace)
+		s.pagesMu.Unlock()
+		go s.watchIdle(ctx, cancel)
+	}
 	go func() {
 		<-ctx.Done()
 		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -150,6 +170,80 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 		return nil
 	}
 	return err
+}
+
+func (s *Server) watchIdle(ctx context.Context, stop context.CancelFunc) {
+	t := time.NewTicker(2 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		now := time.Now()
+		s.pagesMu.Lock()
+		for id, seen := range s.pages {
+			if now.Sub(seen) > pageStale {
+				delete(s.pages, id)
+				if len(s.pages) == 0 {
+					s.emptySince = now
+				}
+			}
+		}
+		idle := len(s.pages) == 0 && now.Sub(s.emptySince) >= s.cfg.IdleExit
+		s.pagesMu.Unlock()
+		if idle && !s.busy() {
+			log.Printf("no dashboard page open for %s, exiting", s.cfg.IdleExit)
+			stop()
+			return
+		}
+	}
+}
+
+func (s *Server) busy() bool {
+	s.mu.Lock()
+	running := s.job != nil && s.job.Running
+	s.mu.Unlock()
+	if running {
+		return true
+	}
+	if !s.opMu.TryLock() {
+		return true
+	}
+	s.opMu.Unlock()
+	return false
+}
+
+func pageID(r *http.Request) string {
+	id := r.URL.Query().Get("page")
+	if len(id) < 8 || len(id) > 64 {
+		return ""
+	}
+	return id
+}
+
+func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
+	if id := pageID(r); id != "" && s.cfg.IdleExit > 0 {
+		s.pagesMu.Lock()
+		s.pages[id] = time.Now()
+		s.pagesMu.Unlock()
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleBye(w http.ResponseWriter, r *http.Request) {
+	if id := pageID(r); id != "" && s.cfg.IdleExit > 0 {
+		s.pagesMu.Lock()
+		if _, ok := s.pages[id]; ok {
+			delete(s.pages, id)
+			if len(s.pages) == 0 {
+				s.emptySince = time.Now()
+			}
+		}
+		s.pagesMu.Unlock()
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) guard(next http.Handler) http.Handler {

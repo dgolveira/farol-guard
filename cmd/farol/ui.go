@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/dgolveira/farol-guard/internal/inventory"
 	"github.com/dgolveira/farol-guard/internal/keys"
@@ -22,6 +23,7 @@ func cmdUI(args []string) error {
 	fs := flag.NewFlagSet("ui", flag.ExitOnError)
 	cfg := fs.String("c", inventory.DefaultPath(), "inventory path")
 	listen := fs.String("listen", "127.0.0.1:7380", "listen address")
+	idleExit := fs.Duration("idle-exit", envDuration("FAROL_GUARD_IDLE_EXIT"), "exit when no dashboard page has been open for this long (0 = never; set by 'farol open')")
 	var allowed listFlag
 	fs.Var(&allowed, "allowed-host", "extra Host header accepted, e.g. the domain of a reverse proxy (repeatable; also FAROL_GUARD_ALLOWED_HOSTS)")
 	noOpen := fs.Bool("no-open", false, "do not open the browser")
@@ -72,7 +74,7 @@ func cmdUI(args []string) error {
 	}
 	hosts := splitList(strings.Join(allowed, ","))
 	hosts = append(hosts, splitList(os.Getenv("FAROL_GUARD_ALLOWED_HOSTS"))...)
-	srv := server.New(server.Config{Listen: *listen, InventoryPath: *cfg, Version: version, Token: token, Dialer: d, AllowedHosts: hosts})
+	srv := server.New(server.Config{Listen: *listen, InventoryPath: *cfg, Version: version, Token: token, Dialer: d, AllowedHosts: hosts, IdleExit: *idleExit})
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -87,4 +89,9 @@ func cmdUI(args []string) error {
 		_ = exec.Command("xdg-open", url).Start()
 	}
 	return srv.Serve(ctx, ln)
+}
+
+func envDuration(key string) time.Duration {
+	d, _ := time.ParseDuration(os.Getenv(key))
+	return d
 }

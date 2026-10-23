@@ -1246,6 +1246,30 @@ function appDialog() {
   });
 }
 
+let connOK = null;
+
+async function checkBackend() {
+  let ok = false;
+  try {
+    const r = await fetch("/api/ping", { cache: "no-store", credentials: "same-origin" });
+    ok = r.ok;
+  } catch (e) { ok = false; }
+  if (ok === connOK) return;
+  connOK = ok;
+  const el = document.getElementById("conn");
+  el.classList.toggle("down", !ok);
+  const label = t(ok ? "ui.conn.ok" : "ui.conn.down");
+  el.title = label;
+  el.setAttribute("aria-label", label);
+}
+
+function startConnWatch() {
+  checkBackend();
+  setInterval(checkBackend, 5000);
+  window.addEventListener("focus", checkBackend);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkBackend(); });
+}
+
 const themes = ["auto", "light", "dark"];
 
 function currentTheme() {
@@ -1279,6 +1303,8 @@ document.getElementById("lang-toggle").addEventListener("click", async () => {
   const next = state.lang === "pt-BR" ? "en" : "pt-BR";
   storeSet("farol.lang", next);
   await loadLang(next);
+  connOK = null;
+  checkBackend();
   render();
 });
 
@@ -1289,5 +1315,6 @@ window.addEventListener("hashchange", render);
   const lang = saved || ((navigator.language || "").toLowerCase().startsWith("pt") ? "pt-BR" : "en");
   state.meta = await api("/api/meta").catch(() => ({}));
   await loadLang(lang);
+  startConnWatch();
   render();
 })();

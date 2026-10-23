@@ -9,6 +9,7 @@ Exec=farol open
 Icon=farol-guard
 Terminal=false
 StartupNotify=false
+StartupWMClass=farol-guard
 Categories=System;Monitor;Security;
 Keywords=ssh;audit;cve;security;server;fleet;
 Actions=stop;

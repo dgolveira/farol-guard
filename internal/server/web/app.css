@@ -171,3 +171,8 @@ dialog .grid2 { grid-template-columns: 1fr 1fr; }
 .pass-row input { flex: 1; }
 [hidden] { display: none !important; }
 details.scope-pop, details.scope-pop:first-of-type { border: 0; }
+.conn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; }
+.conn-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px var(--green-bg); transition: background 200ms ease, box-shadow 200ms ease; }
+.conn.down .conn-dot { background: var(--red); box-shadow: 0 0 0 3px var(--red-bg); animation: conn-pulse 1.4s ease-in-out infinite; }
+@keyframes conn-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .conn.down .conn-dot { animation: none; } }

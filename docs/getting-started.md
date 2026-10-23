@@ -33,7 +33,9 @@ farol check                     # or: farol open
 
 `farol open` (also the **farol-guard** icon in the applications menu when the
 `.deb` is installed) starts the dashboard in the background if needed and opens
-the browser. `farol stop` stops it; `farol ui` runs it in the foreground. The
+it: as an app window when the default browser is Chromium based (Edge, Chrome,
+Chromium, Brave...), otherwise in a normal tab. Closing the window, or closing
+every dashboard tab for about 20 seconds, stops the dashboard. `farol stop` stops it; `farol ui` runs it in the foreground. The
 session token is kept in `~/.config/farol-guard/ui-token`, so the address does
 not change between restarts.
 
