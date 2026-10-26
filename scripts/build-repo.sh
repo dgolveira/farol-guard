@@ -91,6 +91,7 @@ run() {
 
 rm -rf "$out"
 mkdir -p "$out/apt/pool" "$out/rpm/x86_64" "$out/rpm/aarch64" "$out/arch/x86_64" "$out/arch/aarch64"
+out="$(cd "$out" && pwd)"
 cp "$work/public.asc" "$out/farol-guard.asc"
 
 for r in "${rpms[@]}"; do
