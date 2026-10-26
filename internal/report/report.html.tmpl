@@ -52,7 +52,7 @@
   {{if .Reachable}}
   <div class="facts">
     <div class="fact"><div class="k">{{t "f.hostname"}}</div><div class="v mono">{{.Hostname}}</div></div>
-    <div class="fact"><div class="k">{{t "report.os"}}</div><div class="v">{{.OS.Pretty}}</div></div>
+    <div class="fact"><div class="k">{{t "report.os"}}</div><div class="v">{{.OS.Pretty}}{{if .OS.Derived}}<div class="meta">{{t "t.base" (baseName .OS)}}</div>{{end}}</div></div>
     <div class="fact"><div class="k">{{t "f.kernel"}}</div><div class="v mono">{{.Kernel}}</div></div>
     <div class="fact"><div class="k">{{t "f.uptime"}}</div><div class="v">{{dur .UptimeSeconds}}</div></div>
     <div class="fact"><div class="k">{{t "f.cpu"}}</div><div class="v">{{.CPU.Cores}} &middot; load {{f2 .CPU.Load1}} / {{f2 .CPU.Load5}} / {{f2 .CPU.Load15}} &middot; {{pct .CPU.UsagePct}}</div></div>
@@ -115,7 +115,7 @@
         <summary><span class="fix-open">{{t "fix.open"}}</span></summary>
         <div class="fix-body">
           <div class="fix-risk"><strong>{{t "fix.risk.title"}}</strong><ul>
-            <li>{{t "fix.risk.restart"}}</li><li>{{t "fix.risk.reboot"}}</li><li>{{t "fix.risk.deps"}}</li><li>{{t "fix.risk.test"}}</li><li>{{t "fix.risk.never"}}</li>
+            <li>{{t "fix.risk.restart"}}</li><li>{{t "fix.risk.reboot"}}</li><li>{{if eq .Family "rpm"}}{{t "fix.risk.deps.rpm"}}{{else if eq .Family "arch"}}{{t "fix.risk.deps.arch"}}{{else if eq .Family "suse"}}{{if .Rolling}}{{t "fix.risk.deps.rolling"}}{{else}}{{t "fix.risk.deps.suse"}}{{end}}{{else}}{{t "fix.risk.deps"}}{{end}}</li><li>{{t "fix.risk.test"}}</li><li>{{t "fix.risk.never"}}</li>
             {{if .Sensitive}}<li class="fix-warn">{{t "fix.sensitive" (join .Sensitive ", ")}}</li>{{end}}
             {{if .NotInApt}}<li class="fix-warn">{{t "fix.notinapt" .NotInApt}}</li>{{end}}
           </ul></div>
@@ -129,10 +129,10 @@
         <colgroup><col style="width:17%"><col style="width:23%"><col style="width:22%"><col></colgroup>
         <thead><tr><th>CVE</th><th>{{t "c.package"}}</th><th>{{t "c.fix"}}</th><th>{{t "c.summary"}}</th></tr></thead>
         <tbody>{{range limit 150 .Vulns}}<tr>
-          <td><a class="mono cve-id" href="https://osv.dev/vulnerability/{{.ID}}" target="_blank" rel="noopener noreferrer">{{.ID}}</a>
+          <td><a class="mono cve-id" href="{{advisoryURL .ID}}" target="_blank" rel="noopener noreferrer">{{.ID}}</a>
             <div class="cve-sev"><span class="badge {{.Severity}}">{{sev .Severity}}</span>{{if .Score}}<span class="meta mono">{{.Score}}</span>{{end}}</div></td>
           <td class="mono"><div class="cve-pkg">{{.Package}}</div><div class="meta">{{.Version}}</div><div class="cve-to">&rarr; {{if .Fixed}}{{.Fixed}}{{else}}<span class="meta">{{t "t.unfixed"}}</span>{{end}}</div></td>
-          <td>{{if .Fixed}}{{if .Candidate}}<span class="badge ok">{{t "t.inapt"}}</span>{{else}}<span class="badge low">{{t "t.notinapt"}}</span>{{end}}{{if .Binaries}}<div class="mono fix-cmd">apt-get install --only-upgrade{{range .Binaries}} <span class="nowrap">{{.}}</span>{{end}}</div>{{end}}{{end}}</td>
+          <td>{{if .Fixed}}{{if .Candidate}}<span class="badge ok">{{t "t.inapt"}}</span>{{else}}<span class="badge low">{{t "t.notinapt"}}</span>{{end}}{{if .FixCmd}}<div class="mono fix-cmd">{{range $i, $w := words .FixCmd}}{{if $i}} {{end}}<span class="nowrap">{{$w}}</span>{{end}}</div>{{end}}{{end}}</td>
           <td class="cve-summary">{{if .Details}}<details class="cve-more" title="{{.Details}}"><summary>{{.Details}}</summary></details>{{else}}{{.Summary}}{{end}}</td>
         </tr>{{end}}</tbody>
       </table></div>{{if gt (len .Vulns) 150}}<p class="note">{{t "t.more" (rest 150 (len .Vulns))}}</p>{{end}}{{else}}<p class="note">{{t "report.none"}}</p>{{end}}</div>

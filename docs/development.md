@@ -5,7 +5,8 @@
 - Go 1.26 (or only Docker: every `make` target runs inside
   `docker.io/library/golang:1.26-bookworm`).
 - Docker with the compose plugin for the test lab.
-- `dpkg-deb` to build the `.deb` packages.
+- `dpkg-deb` to build the `.deb` packages (`.rpm` and Arch packages are built
+  with `docker.io/goreleaser/nfpm`).
 
 ## Common tasks
 
@@ -16,15 +17,56 @@ make build-all    # dist/farol-linux-amd64 and dist/farol-linux-arm64
 make test         # unit tests
 make vet
 make deb          # dist/farol-guard_<version>_{amd64,arm64}.deb
+make rpm          # dist/farol-guard-<version>-1.{x86_64,aarch64}.rpm
+make archpkg      # dist/farol-guard-<version>-1-{x86_64,aarch64}.pkg.tar.zst
+make packages     # all of the above
+make install      # install dist/farol and desktop/systemd files (PREFIX, DESTDIR)
 make docker       # container image
 ```
 
 ## Test lab
 
-`test/lab` starts Debian 12, Ubuntu 24.04 and Ubuntu 22.04 containers running
-`sshd` on `127.0.0.1:2201-2203`, plus an unreachable host, with a throwaway key
-generated in `.cache/lab/` (ignored by git). The Debian container enables weak
-`sshd` settings on purpose so findings show up.
+`test/lab` starts containers running `sshd` on `127.0.0.1`, plus an unreachable
+host, with a throwaway key generated in `.cache/lab/` (ignored by git):
+
+| Port | Host | Notes |
+| --- | --- | --- |
+| 2201 | Debian 12 | weak `sshd` settings on purpose so findings show up |
+| 2202, 2203 | Ubuntu 24.04, 22.04 | 22.04 logs in as `deploy` with sudo |
+| 2204 | Linux Mint 22 | Mint image with the real Mint `os-release` mounted (derivative mapping) |
+| 2205 to 2207 | Rocky 9.4, AlmaLinux 9.4, CentOS Stream 9 | old point releases, so security advisories show up |
+| 2208 | Fedora | `dnf5`, logs in as `deploy` |
+| 2209, 2210 | Oracle Linux 9, Amazon Linux 2023 | |
+| 2211 | Arch Linux | |
+
+`test/lab` also has Amazon Linux 2 and CentOS 7 (yum, 2212-2213) and openSUSE
+Leap 16.0 and Tumbleweed (zypper, 2214-2215).
+
+### Virtual machines
+
+`test/vm/run.sh up` boots KVM virtual machines from official cloud images
+(Debian 13, Rocky 9, Fedora, openSUSE Leap 16) with real systemd, kernels and
+reboots, SSH on `127.0.0.1:2301-2304` and the lab key for root, and writes
+`test/vm/inventory.yaml`. Disks are copy-on-write in `.cache/vm`;
+`test/vm/run.sh down` powers them off and `reset` deletes the disks. The Arch
+cloud image does not start sshd from cloud-init, so Arch is covered by the
+container lab only.
+
+```bash
+test/vm/run.sh up
+./dist/farol check -c test/vm/inventory.yaml --known-hosts .cache/vm/known_hosts --accept-new --refresh
+test/vm/run.sh down
+```
+
+### Package repositories
+
+`scripts/build-repo.sh --key <fingerprint> --passphrase-file <file>` signs the
+packages in `dist/` and builds the apt, dnf/zypper and pacman repositories in
+`dist/site` (the release workflow publishes it to GitHub Pages). Test it with a
+throwaway key and `python3 -m http.server` before changing the workflow.
+
+To exercise pending updates on an up-to-date image, downgrade a package inside
+the container, for example `docker exec lab-fedora-1 dnf -y downgrade sudo`.
 
 ```bash
 test/lab/setup.sh                 # build and start, writes test/lab/inventory.yaml

@@ -25,7 +25,35 @@ var Style string
 
 type Format string
 
-var advisoryID = regexp.MustCompile(`^(CVE|GHSA|USN|DSA|DLA|DTSA|UBUNTU|DEBIAN|PYSEC|GO|OSV)-[0-9A-Za-z.:-]+$`)
+var advisoryID = regexp.MustCompile(`^(CVE|GHSA|USN|DSA|DLA|DTSA|UBUNTU|DEBIAN|PYSEC|GO|OSV|AVG|RHSA|RHBA|RHEA|RLSA|ALSA|ELSA|ALAS|ALAS2|ALAS2023|FEDORA|SUSE-SU|openSUSE-SU)-[0-9A-Za-z.:-]+$`)
+
+var baseNames = map[string]string{
+	"ubuntu": "Ubuntu", "debian": "Debian", "rhel": "RHEL", "fedora": "Fedora", "arch": "Arch Linux",
+	"centos": "CentOS", "rocky": "Rocky Linux", "opensuse-leap": "openSUSE Leap", "opensuse-tumbleweed": "openSUSE Tumbleweed", "sles": "SLES", "almalinux": "AlmaLinux", "ol": "Oracle Linux", "amzn": "Amazon Linux",
+}
+
+func baseName(o model.OSInfo) string {
+	name := baseNames[o.BaseID]
+	if name == "" {
+		name = o.BaseID
+	}
+	return strings.TrimSpace(name + " " + o.BaseVersion)
+}
+
+func advisoryURL(id string) string {
+	esc := url.PathEscape(id)
+	switch {
+	case strings.HasPrefix(id, "AVG-"):
+		return "https://security.archlinux.org/" + esc
+	case strings.HasPrefix(id, "RHSA-"), strings.HasPrefix(id, "RHBA-"), strings.HasPrefix(id, "RHEA-"):
+		return "https://access.redhat.com/errata/" + esc
+	case strings.HasPrefix(id, "FEDORA-"):
+		return "https://bodhi.fedoraproject.org/updates/" + esc
+	case strings.HasPrefix(id, "ELSA-"):
+		return "https://linux.oracle.com/errata/" + esc + ".html"
+	}
+	return "https://osv.dev/vulnerability/" + esc
+}
 
 func detailHTML(s string) template.HTML {
 	var b strings.Builder
@@ -37,7 +65,7 @@ func detailHTML(s string) template.HTML {
 		}
 		switch {
 		case i == 0 && advisoryID.MatchString(p):
-			fmt.Fprintf(&b, `<a class="detail-id" href="https://osv.dev/vulnerability/%s" target="_blank" rel="noopener noreferrer">%s</a>`, url.PathEscape(p), esc)
+			fmt.Fprintf(&b, `<a class="detail-id" href="%s" target="_blank" rel="noopener noreferrer">%s</a>`, template.HTMLEscapeString(advisoryURL(p)), esc)
 		case long:
 			fmt.Fprintf(&b, `<span class="detail-desc">%s</span>`, esc)
 		default:
@@ -139,7 +167,10 @@ func Funcs(lang string) template.FuncMap {
 			}
 			return c.Load5 / float64(c.Cores)
 		},
-		"detail": detailHTML,
+		"detail":      detailHTML,
+		"advisoryURL": advisoryURL,
+		"baseName":    baseName,
+		"words":       strings.Fields,
 		"dcount": func(d []string) int {
 			n := len(d)
 			if n > 0 && strings.HasPrefix(d[n-1], "+") {

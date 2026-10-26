@@ -22,6 +22,24 @@ expect. You should receive an answer within 5 business days. Please give a
 reasonable time for a fix before public disclosure; credit is given in the
 release notes unless you prefer otherwise.
 
+## Release signing key
+
+Packages, repository indexes and `SHA256SUMS` from version 1.1.0 on are signed
+with the key in [packaging/signing/farol-guard.asc](packaging/signing/farol-guard.asc):
+
+```text
+farol-guard release signing <contato@dgoliveira.com.br>
+F298 B0C2 3F87 FEAC AC95  3023 04EB 9326 3E1F 5972
+```
+
+Verify a download with:
+
+```bash
+gpg --import packaging/signing/farol-guard.asc
+gpg --verify SHA256SUMS.asc SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
 ## Scope
 
 In scope:

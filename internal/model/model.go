@@ -78,12 +78,38 @@ type User struct {
 }
 
 type OSInfo struct {
-	ID        string `json:"id"`
-	VersionID string `json:"version_id"`
-	Codename  string `json:"codename"`
-	Pretty    string `json:"pretty"`
-	LTS       bool   `json:"lts"`
-	EOL       string `json:"eol,omitempty"`
+	ID          string `json:"id"`
+	VersionID   string `json:"version_id"`
+	Codename    string `json:"codename"`
+	Pretty      string `json:"pretty"`
+	LTS         bool   `json:"lts"`
+	EOL         string `json:"eol,omitempty"`
+	Family      string `json:"family,omitempty"`
+	PkgTool     string `json:"pkg_tool,omitempty"`
+	BaseID      string `json:"base_id,omitempty"`
+	BaseVersion string `json:"base_version,omitempty"`
+}
+
+const (
+	FamilyDeb  = "deb"
+	FamilyRPM  = "rpm"
+	FamilyArch = "arch"
+	FamilySUSE = "suse"
+)
+
+func (o OSInfo) Rolling() bool {
+	return o.Family == FamilyArch || o.BaseID == "opensuse-tumbleweed"
+}
+
+func (o OSInfo) Derived() bool {
+	return o.BaseID != "" && o.BaseID != o.ID
+}
+
+type RPMAdvisory struct {
+	ID       string `json:"id"`
+	CVE      string `json:"cve,omitempty"`
+	Severity string `json:"severity"`
+	Package  string `json:"package"`
 }
 
 type SSHDConfig struct {
@@ -107,6 +133,8 @@ type Package struct {
 }
 
 type FixPlan struct {
+	Family          string   `json:"family"`
+	Rolling         bool     `json:"rolling,omitempty"`
 	Packages        []string `json:"packages"`
 	Sensitive       []string `json:"sensitive,omitempty"`
 	NotInApt        int      `json:"not_in_apt,omitempty"`
@@ -213,6 +241,8 @@ type Vuln struct {
 	Details   string   `json:"details,omitempty"`
 	Binaries  []string `json:"binaries,omitempty"`
 	Candidate string   `json:"apt_candidate,omitempty"`
+	FixCmd    string   `json:"fix_command,omitempty"`
+	Advisory  string   `json:"advisory,omitempty"`
 }
 
 func (v Vuln) Rank() int {
@@ -247,19 +277,20 @@ type HostReport struct {
 	Kernel        string        `json:"kernel,omitempty"`
 	UptimeSeconds float64       `json:"uptime_seconds"`
 
-	Users       []User      `json:"users,omitempty"`
-	SSHD        SSHDConfig  `json:"sshd"`
-	Packages    []Package   `json:"packages,omitempty"`
-	Upgrades    []Upgrade   `json:"upgrades,omitempty"`
-	AptListsAge float64     `json:"apt_lists_age_days"`
-	Reboot      bool        `json:"reboot_required"`
-	RebootPkgs  []string    `json:"reboot_packages,omitempty"`
-	Unattended  bool        `json:"unattended_upgrades"`
-	Snaps       []Snap      `json:"snaps,omitempty"`
-	Containers  []Container `json:"containers,omitempty"`
-	Services    []string    `json:"services,omitempty"`
-	FailedUnits []string    `json:"failed_units,omitempty"`
-	Listening   []Listener  `json:"listening,omitempty"`
+	Users       []User        `json:"users,omitempty"`
+	SSHD        SSHDConfig    `json:"sshd"`
+	Packages    []Package     `json:"packages,omitempty"`
+	Upgrades    []Upgrade     `json:"upgrades,omitempty"`
+	AptListsAge float64       `json:"apt_lists_age_days"`
+	Reboot      bool          `json:"reboot_required"`
+	RebootPkgs  []string      `json:"reboot_packages,omitempty"`
+	Unattended  bool          `json:"unattended_upgrades"`
+	Advisories  []RPMAdvisory `json:"rpm_advisories,omitempty"`
+	Snaps       []Snap        `json:"snaps,omitempty"`
+	Containers  []Container   `json:"containers,omitempty"`
+	Services    []string      `json:"services,omitempty"`
+	FailedUnits []string      `json:"failed_units,omitempty"`
+	Listening   []Listener    `json:"listening,omitempty"`
 
 	Logins    []Login     `json:"logins,omitempty"`
 	IPs       []IPSummary `json:"ips,omitempty"`

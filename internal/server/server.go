@@ -596,7 +596,7 @@ func (s *Server) handleStartCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	job := &Job{Running: true, Started: time.Now(), Total: len(hosts), cancel: cancel}
-	job.logf("starting check of %d hosts (apt-get update: %v, CVE lookup: %v)", len(hosts), req.Refresh, !req.NoCVE)
+	job.logf("starting check of %d hosts (refresh package lists: %v, CVE lookup: %v)", len(hosts), req.Refresh, !req.NoCVE)
 	s.job = job
 	s.mu.Unlock()
 

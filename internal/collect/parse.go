@@ -60,6 +60,14 @@ func Parse(h *model.HostReport, out []byte, keyLabels map[string]string) {
 		Pretty:    osr["PRETTY_NAME"],
 		LTS:       strings.Contains(osr["VERSION"], "LTS"),
 	}
+	family := ""
+	if f := s["pkg_family"]; len(f) > 0 && f[0] != "unknown" {
+		family = f[0]
+		if len(f) > 1 {
+			h.OS.PkgTool = f[1]
+		}
+	}
+	resolveBase(&h.OS, osr, family)
 	if len(s["kernel"]) > 0 {
 		h.Kernel = s["kernel"][0]
 	}
@@ -69,8 +77,24 @@ func Parse(h *model.HostReport, out []byte, keyLabels map[string]string) {
 
 	h.Users = parseUsers(s, keyLabels)
 	h.SSHD = parseSSHD(s)
-	h.Packages = parsePackages(s["packages"])
-	h.Upgrades = parseUpgrades(s["upgradable"])
+	switch h.OS.Family {
+	case model.FamilyRPM:
+		h.Packages = parseRPMPackages(s["packages_rpm"])
+		h.Advisories = parseRPMAdvisories(s["security_rpm"])
+		h.Upgrades = parseRPMUpgrades(s["upgradable_rpm"], h.Packages, h.Advisories)
+		h.Unattended = len(s["unattended_rpm"]) > 0
+	case model.FamilySUSE:
+		h.Packages = parseRPMPackages(s["packages_rpm"])
+		h.Upgrades = parseSUSEUpgrades(s["upgradable_suse"], h.Packages, parseSUSEPatches(s["patches_suse"]))
+		h.Unattended = len(s["unattended_rpm"]) > 0
+	case model.FamilyArch:
+		h.Packages = parseArchPackages(s["packages_arch"])
+		h.Upgrades = parseArchUpgrades(s["upgradable_arch"])
+	default:
+		h.Packages = parsePackages(s["packages"])
+		h.Upgrades = parseUpgrades(s["upgradable"])
+		h.Unattended = parseUnattended(s["unattended"])
+	}
 	if l := s["apt_lists_mtime"]; len(l) == 2 {
 		mt, _ := strconv.ParseFloat(l[0], 64)
 		now, _ := strconv.ParseFloat(l[1], 64)
@@ -88,7 +112,6 @@ func Parse(h *model.HostReport, out []byte, keyLabels map[string]string) {
 			}
 		}
 	}
-	h.Unattended = parseUnattended(s["unattended"])
 	h.Snaps = parseSnaps(s["snaps"])
 	h.Containers = parseContainers(s["containers"])
 	h.Services = s["services"]

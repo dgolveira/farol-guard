@@ -56,21 +56,43 @@ func (c *Client) logf(format string, a ...any) {
 }
 
 func Ecosystem(os model.OSInfo) string {
-	switch os.ID {
+	id, version := os.BaseID, os.BaseVersion
+	if id == "" && os.Family == "" {
+		id, version = os.ID, os.VersionID
+	}
+	switch id {
+	case "opensuse-tumbleweed":
+		return "openSUSE:Tumbleweed"
+	case "opensuse-leap":
+		if version == "" {
+			return ""
+		}
+		return "openSUSE:Leap " + version
+	case "sles":
+		major, minor, _ := strings.Cut(version, ".")
+		switch {
+		case major == "":
+			return ""
+		case major == "15" && minor != "" && minor != "0":
+			return "SUSE:Linux Enterprise Server 15 SP" + minor
+		case major == "15":
+			return "SUSE:Linux Enterprise Server 15"
+		}
+		return "SUSE:Linux Enterprise Server " + version
 	case "debian":
-		major, _, _ := strings.Cut(os.VersionID, ".")
+		major, _, _ := strings.Cut(version, ".")
 		if major == "" {
 			return ""
 		}
 		return "Debian:" + major
 	case "ubuntu":
-		if os.VersionID == "" {
+		if version == "" {
 			return ""
 		}
 		if os.LTS {
-			return "Ubuntu:" + os.VersionID + ":LTS"
+			return "Ubuntu:" + version + ":LTS"
 		}
-		return "Ubuntu:" + os.VersionID
+		return "Ubuntu:" + version
 	}
 	return ""
 }
@@ -91,6 +113,35 @@ type pkgResult struct {
 }
 
 func (c *Client) Enrich(ctx context.Context, hosts []*model.HostReport, progress func(done, total int)) error {
+	var arch, rpm []*model.HostReport
+	for _, h := range hosts {
+		switch h.OS.Family {
+		case model.FamilyRPM:
+			FromRPM(h)
+			rpm = append(rpm, h)
+		case model.FamilyArch:
+			arch = append(arch, h)
+		}
+	}
+	var errs []error
+	if err := c.EnrichArch(ctx, arch); err != nil {
+		c.logf("cve: arch security tracker: %v", err)
+		errs = append(errs, err)
+	}
+	if err := c.EnrichRedHat(ctx, rpm, progress); err != nil {
+		c.logf("cve: red hat security data: %v", err)
+		errs = append(errs, err)
+	}
+	if err := c.enrichOSV(ctx, hosts, progress); err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		return errs[0]
+	}
+	return nil
+}
+
+func (c *Client) enrichOSV(ctx context.Context, hosts []*model.HostReport, progress func(done, total int)) error {
 	need := map[query]bool{}
 	for _, h := range hosts {
 		eco := Ecosystem(h.OS)
@@ -187,18 +238,22 @@ func (c *Client) Enrich(ctx context.Context, hosts []*model.HostReport, progress
 				h.VulnBulk = append(h.VulnBulk, model.VulnBulk{Package: q.name, Version: q.version, Count: r.Bulk, More: r.More})
 			}
 		}
-		sort.SliceStable(h.Vulns, func(i, j int) bool {
-			a, b := h.Vulns[i], h.Vulns[j]
-			if (a.Fixed != "") != (b.Fixed != "") {
-				return a.Fixed != ""
-			}
-			if a.Rank() != b.Rank() {
-				return a.Rank() > b.Rank()
-			}
-			return a.Score > b.Score
-		})
+		sortVulns(h)
 	}
 	return firstErr
+}
+
+func sortVulns(h *model.HostReport) {
+	sort.SliceStable(h.Vulns, func(i, j int) bool {
+		a, b := h.Vulns[i], h.Vulns[j]
+		if (a.Fixed != "") != (b.Fixed != "") {
+			return a.Fixed != ""
+		}
+		if a.Rank() != b.Rank() {
+			return a.Rank() > b.Rank()
+		}
+		return a.Score > b.Score
+	})
 }
 
 func (c *Client) readPkgCache(q query) *pkgResult {
@@ -402,7 +457,11 @@ func buildVulns(raw []osvVuln, q query) []model.Vuln {
 		if isAdvisory(r.ID) && advisoryCovered(r, covered) {
 			continue
 		}
-		out = append(out, convert(r, q))
+		v := convert(r, q)
+		if isSUSE(q.eco) && v.Fixed != "" && Vercmp(q.version, v.Fixed) >= 0 {
+			continue
+		}
+		out = append(out, v)
 	}
 	return out
 }
@@ -446,6 +505,10 @@ func isAdvisory(id string) bool {
 		}
 	}
 	return false
+}
+
+func isSUSE(eco string) bool {
+	return strings.HasPrefix(eco, "openSUSE:") || strings.HasPrefix(eco, "SUSE:")
 }
 
 func cveID(id string) string {
@@ -507,6 +570,15 @@ func convert(r osvVuln, q query) model.Vuln {
 		}
 		if u, ok := a.EcosystemSpecific["urgency"].(string); ok {
 			urgency = strings.TrimSuffix(u, "*")
+		}
+		if bins, ok := a.EcosystemSpecific["binaries"].([]any); ok && isSUSE(q.eco) {
+			for _, b := range bins {
+				if m, ok := b.(map[string]any); ok {
+					if f, ok := m[q.name].(string); ok && f != "" {
+						v.Fixed = f
+					}
+				}
+			}
 		}
 	}
 

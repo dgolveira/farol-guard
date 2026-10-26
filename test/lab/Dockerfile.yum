@@ -1,0 +1,12 @@
+ARG BASE=docker.io/library/amazonlinux:2
+FROM ${BASE}
+RUN if grep -q 'CentOS Linux 7' /etc/os-release; then \
+      sed -i -e 's|^mirrorlist=|#mirrorlist=|' -e 's|^#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|' /etc/yum.repos.d/CentOS-*.repo; \
+    fi \
+ && yum -y install openssh-server sudo iproute procps-ng shadow-utils \
+ && useradd -m -s /bin/bash deploy \
+ && echo 'deploy ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/deploy \
+ && chmod 0440 /etc/sudoers.d/deploy \
+ && yum -q makecache fast
+COPY entrypoint.sh /entrypoint.sh
+CMD ["/entrypoint.sh"]

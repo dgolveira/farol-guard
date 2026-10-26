@@ -118,6 +118,9 @@ func cmdOpen(args []string) error {
 	}
 	url := fmt.Sprintf("http://%s/?token=%s", *listen, token)
 	fmt.Println(url)
+	if isWSL() {
+		return openWSL(url, *noApp)
+	}
 	if !*noApp {
 		if browser := defaultChromium(); browser != "" {
 			return runAppWindow(browser, url, *listen)

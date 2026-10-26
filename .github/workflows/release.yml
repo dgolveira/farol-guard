@@ -33,8 +33,35 @@ jobs:
         run: |
           scripts/build-deb.sh --version "${{ steps.v.outputs.version }}" --arch amd64
           scripts/build-deb.sh --version "${{ steps.v.outputs.version }}" --arch arm64
+      - name: build .rpm and Arch packages
+        run: |
+          for arch in amd64 arm64; do
+            install -Dm755 dist/farol-linux-$arch dist/nfpm/farol
+            for kind in rpm archlinux; do
+              docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/src -w /src -e FAROL_ARCH=$arch -e FAROL_VERSION="${{ steps.v.outputs.version }}" \
+                docker.io/goreleaser/nfpm:v2.47.0 package -f packaging/nfpm/nfpm.yaml -p $kind -t dist/
+            done
+          done
+          rm -rf dist/nfpm
+      - name: import signing key
+        id: key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          printf '%s\n' "$GPG_PRIVATE_KEY" | gpg --batch --import
+          printf '%s' "$GPG_PASSPHRASE" > "$RUNNER_TEMP/gpg-pass"
+          chmod 600 "$RUNNER_TEMP/gpg-pass"
+          echo "fpr=$(gpg --batch --with-colons --list-secret-keys | awk -F: '/^fpr/ {print $10; exit}')" >> "$GITHUB_OUTPUT"
+      - name: sign packages and build repositories
+        run: scripts/build-repo.sh --key "${{ steps.key.outputs.fpr }}" --passphrase-file "$RUNNER_TEMP/gpg-pass" --out dist/site
       - name: checksums
-        run: cd dist && sha256sum farol-linux-* farol-guard_*.deb > SHA256SUMS
+        run: |
+          cd dist
+          sha256sum farol-linux-* farol-guard_*.deb farol-guard-*.rpm farol-guard-*.pkg.tar.zst > SHA256SUMS
+          gpg --batch --pinentry-mode loopback --passphrase-file "$RUNNER_TEMP/gpg-pass" \
+            --local-user "${{ steps.key.outputs.fpr }}" --armor --detach-sign --output SHA256SUMS.asc SHA256SUMS
+          rm -f "$RUNNER_TEMP/gpg-pass"
       - uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
@@ -42,7 +69,28 @@ jobs:
             dist/farol-linux-amd64
             dist/farol-linux-arm64
             dist/farol-guard_*.deb
+            dist/farol-guard-*.rpm
+            dist/farol-guard-*.pkg.tar.zst
+            dist/farol-guard-*.pkg.tar.zst.sig
             dist/SHA256SUMS
+            dist/SHA256SUMS.asc
+            dist/site/farol-guard.asc
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist/site
+
+  pages:
+    needs: packages
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v5
 
   image:
     runs-on: ubuntu-24.04
@@ -72,4 +120,4 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.licenses=MIT
-            org.opencontainers.image.description=Agentless SSH auditor for Debian and Ubuntu server fleets
+            org.opencontainers.image.description=Agentless SSH auditor for Linux server fleets

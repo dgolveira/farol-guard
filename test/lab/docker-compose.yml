@@ -15,3 +15,65 @@ services:
     image: farol-lab:ubuntu2204
     ports: ["127.0.0.1:2203:22"]
     volumes: ["../../.cache/lab/authorized_keys:/lab/authorized_keys:ro"]
+  mint22:
+    build: { context: ., args: { BASE: docker.io/linuxmintd/mint22-amd64 } }
+    image: farol-lab:mint22
+    ports: ["127.0.0.1:2204:22"]
+    volumes:
+      - ../../.cache/lab/authorized_keys:/lab/authorized_keys:ro
+      - ./os-release.mint22:/usr/lib/os-release:ro
+  rocky9:
+    build: { context: ., dockerfile: Dockerfile.rpm, args: { BASE: docker.io/rockylinux/rockylinux:9.4 } }
+    image: farol-lab:rocky9
+    ports: ["127.0.0.1:2205:22"]
+    volumes: ["../../.cache/lab/authorized_keys:/lab/authorized_keys:ro"]
+  alma9:
+    build: { context: ., dockerfile: Dockerfile.rpm, args: { BASE: docker.io/library/almalinux:9.4 } }
+    image: farol-lab:alma9
+    ports: ["127.0.0.1:2206:22"]
+    volumes: ["../../.cache/lab/authorized_keys:/lab/authorized_keys:ro"]
+  centos9:
+    build: { context: ., dockerfile: Dockerfile.rpm, args: { BASE: quay.io/centos/centos:stream9 } }
+    image: farol-lab:centos9
+    ports: ["127.0.0.1:2207:22"]
+    volumes: ["../../.cache/lab/authorized_keys:/lab/authorized_keys:ro"]
+  fedora:
+    build: { context: ., dockerfile: Dockerfile.rpm, args: { BASE: registry.fedoraproject.org/fedora:latest } }
+    image: farol-lab:fedora
+    ports: ["127.0.0.1:2208:22"]
+    volumes: ["../../.cache/lab/authorized_keys:/lab/authorized_keys:ro"]
+  oracle9:
+    build: { context: ., dockerfile: Dockerfile.rpm, args: { BASE: docker.io/library/oraclelinux:9 } }
+    image: farol-lab:oracle9
+    ports: ["127.0.0.1:2209:22"]
+    volumes: ["../../.cache/lab/authorized_keys:/lab/authorized_keys:ro"]
+  amazon2023:
+    build: { context: ., dockerfile: Dockerfile.rpm, args: { BASE: docker.io/library/amazonlinux:2023 } }
+    image: farol-lab:amazon2023
+    ports: ["127.0.0.1:2210:22"]
+    volumes: ["../../.cache/lab/authorized_keys:/lab/authorized_keys:ro"]
+  arch:
+    build: { context: ., dockerfile: Dockerfile.arch }
+    image: farol-lab:arch
+    ports: ["127.0.0.1:2211:22"]
+    volumes: ["../../.cache/lab/authorized_keys:/lab/authorized_keys:ro"]
+  amazon2:
+    build: { context: ., dockerfile: Dockerfile.yum, args: { BASE: docker.io/library/amazonlinux:2 } }
+    image: farol-lab:amazon2
+    ports: ["127.0.0.1:2212:22"]
+    volumes: ["../../.cache/lab/authorized_keys:/lab/authorized_keys:ro"]
+  centos7:
+    build: { context: ., dockerfile: Dockerfile.yum, args: { BASE: docker.io/library/centos:7 } }
+    image: farol-lab:centos7
+    ports: ["127.0.0.1:2213:22"]
+    volumes: ["../../.cache/lab/authorized_keys:/lab/authorized_keys:ro"]
+  leap16:
+    build: { context: ., dockerfile: Dockerfile.suse, args: { BASE: docker.io/opensuse/leap:16.0 } }
+    image: farol-lab:leap16
+    ports: ["127.0.0.1:2214:22"]
+    volumes: ["../../.cache/lab/authorized_keys:/lab/authorized_keys:ro"]
+  tumbleweed:
+    build: { context: ., dockerfile: Dockerfile.suse, args: { BASE: docker.io/opensuse/tumbleweed:latest } }
+    image: farol-lab:tumbleweed
+    ports: ["127.0.0.1:2215:22"]
+    volumes: ["../../.cache/lab/authorized_keys:/lab/authorized_keys:ro"]

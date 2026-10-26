@@ -1,0 +1,9 @@
+ARG BASE=docker.io/rockylinux/rockylinux:9.4
+FROM ${BASE}
+RUN dnf -y --setopt=install_weak_deps=False install openssh-server sudo iproute procps-ng shadow-utils \
+ && useradd -m -s /bin/bash deploy \
+ && echo 'deploy ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/deploy \
+ && chmod 0440 /etc/sudoers.d/deploy \
+ && dnf -q makecache
+COPY entrypoint.sh /entrypoint.sh
+CMD ["/entrypoint.sh"]

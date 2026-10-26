@@ -1,0 +1,45 @@
+name: farol-guard
+arch: ${FAROL_ARCH}
+platform: linux
+version: ${FAROL_VERSION}
+release: 1
+section: admin
+priority: optional
+maintainer: Douglas Oliveira <contato@dgoliveira.com.br>
+description: |
+  Agentless SSH auditor for Linux server fleets (Debian, Ubuntu, RHEL family,
+  Fedora, Amazon Linux, Arch and derivatives): users, keys, sshd, updates,
+  CVEs, resources, with a local dashboard and safe SSH key rotation.
+vendor: farol-guard
+homepage: https://github.com/dgolveira/farol-guard
+license: MIT
+recommends:
+  - xdg-utils
+overrides:
+  rpm:
+    recommends:
+      - openssh-clients
+      - xdg-utils
+  archlinux:
+    recommends: []
+contents:
+  - src: dist/nfpm/farol
+    dst: /usr/bin/farol
+    file_info: { mode: 0755 }
+  - src: packaging/deb/farol-guard.desktop
+    dst: /usr/share/applications/farol-guard.desktop
+  - src: internal/server/web/icon.svg
+    dst: /usr/share/icons/hicolor/scalable/apps/farol-guard.svg
+  - src: packaging/systemd/farol-guard-ui.service
+    dst: /usr/lib/systemd/user/farol-guard-ui.service
+  - src: packaging/systemd/farol-guard-check.service
+    dst: /usr/lib/systemd/user/farol-guard-check.service
+  - src: packaging/systemd/farol-guard-check.timer
+    dst: /usr/lib/systemd/user/farol-guard-check.timer
+  - src: LICENSE
+    dst: /usr/share/licenses/farol-guard/LICENSE
+rpm:
+  group: Applications/System
+  compression: xz
+archlinux:
+  packager: Douglas Oliveira <contato@dgoliveira.com.br>

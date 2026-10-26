@@ -27,9 +27,12 @@ type Options struct {
 
 var sectionLabels = map[string]string{
 	"meta": "identifying host", "passwd": "reading users and groups", "authorized_keys": "reading authorized_keys",
-	"sshd_effective": "reading sshd configuration", "apt_update": "running apt-get update",
+	"sshd_effective": "reading sshd configuration", "refresh": "refreshing package lists",
 	"packages": "listing installed packages", "upgradable": "checking pending updates",
-	"snaps": "listing snaps and containers", "services": "listing services", "listening": "listing open ports",
+	"packages_rpm": "listing installed packages", "upgradable_rpm": "checking pending updates",
+	"security_rpm": "reading dnf security advisories", "packages_arch": "listing installed packages",
+	"upgradable_arch": "checking pending updates",
+	"snaps":           "listing snaps and containers", "services": "listing services", "listening": "listing open ports",
 	"sshd_log": "reading SSH access log", "firewall": "checking firewall", "kernel_errors": "reading kernel errors",
 	"net_dev": "reading network counters", "df": "reading disks", "meminfo": "reading memory",
 	"cpu_stat": "sampling CPU", "end": "collection finished",
@@ -75,7 +78,7 @@ func Host(ctx context.Context, d *sshx.Dialer, h inventory.Host, keyLabels map[s
 
 	payload := script
 	if opts.RefreshApt {
-		payload = append([]byte("FAROL_APT_UPDATE=1\n"), script...)
+		payload = append([]byte("FAROL_REFRESH=1\n"), script...)
 	}
 	cctx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()

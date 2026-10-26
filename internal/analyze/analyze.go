@@ -17,6 +17,13 @@ var eolDates = map[string]string{
 	"ubuntu:18.04": "2023-05-31", "ubuntu:20.04": "2025-05-31", "ubuntu:22.04": "2027-04-30",
 	"ubuntu:24.04": "2029-04-30", "ubuntu:24.10": "2025-07-10", "ubuntu:25.04": "2026-01-15",
 	"ubuntu:25.10": "2026-07-15", "ubuntu:26.04": "2031-04-30",
+	"opensuse-leap:15.5": "2024-12-31", "opensuse-leap:15.6": "2026-04-30", "opensuse-leap:16.0": "2027-10-31",
+	"rhel:7": "2024-06-30", "rhel:8": "2029-05-31", "rhel:9": "2032-05-31", "rhel:10": "2035-05-31",
+	"rocky:8": "2029-05-31", "rocky:9": "2032-05-31", "rocky:10": "2035-05-31",
+	"almalinux:8": "2029-03-01", "almalinux:9": "2032-05-31", "almalinux:10": "2035-05-31",
+	"ol:7": "2024-12-31", "ol:8": "2029-07-31", "ol:9": "2032-06-30",
+	"centos:7": "2024-06-30", "centos:8": "2024-05-31", "centos:9": "2027-05-31",
+	"amzn:2": "2026-06-30", "amzn:2023": "2029-06-30",
 }
 
 var weakAlgos = []string{"cbc", "arcfour", "hmac-md5", "-96", "diffie-hellman-group1-", "diffie-hellman-group14-sha1", "diffie-hellman-group-exchange-sha1", "ssh-dss"}
@@ -58,6 +65,7 @@ func Host(h *model.HostReport, t inventory.Thresholds, now time.Time) {
 	users(a, h)
 	sshd(a, h)
 	system(a, h, t, now)
+	annotateVulns(h)
 	updates(a, h, t)
 	vulns(a, h)
 	resources(a, h, t)
@@ -157,12 +165,18 @@ func sshd(a adder, h *model.HostReport) {
 }
 
 func system(a adder, h *model.HostReport, t inventory.Thresholds, now time.Time) {
-	if h.OS.ID != "debian" && h.OS.ID != "ubuntu" {
+	id, version := h.OS.BaseID, h.OS.BaseVersion
+	switch {
+	case h.OS.Family == "" && (h.OS.ID == "debian" || h.OS.ID == "ubuntu"):
+		id, version = h.OS.ID, h.OS.VersionID
+	case h.OS.Family == "":
 		a.add(model.SevInfo, "system", "unsupported_os", h.OS.Pretty)
+	case h.OS.Family == model.FamilyDeb && id == "":
+		a.add(model.SevInfo, "system", "os_unmapped", h.OS.Pretty)
 	}
-	key := h.OS.ID + ":" + h.OS.VersionID
-	if h.OS.ID == "debian" {
-		major, _, _ := strings.Cut(h.OS.VersionID, ".")
+	key := id + ":" + version
+	if id == "debian" {
+		major, _, _ := strings.Cut(version, ".")
 		key = "debian:" + major
 	}
 	if d, ok := eolDates[key]; ok {
@@ -200,14 +214,32 @@ func updates(a adder, h *model.HostReport, t inventory.Thresholds) {
 	if h.AptListsAge > t.AptListsMaxDays {
 		a.add(model.SevLow, "updates", "apt_lists_stale", int(h.AptListsAge))
 	}
-	if !h.Unattended && len(h.Packages) > 0 {
+	if h.OS.Family == model.FamilyRPM && h.OS.ID == "centos" && len(h.Advisories) == 0 {
+		a.add(model.SevInfo, "updates", "cve_no_advisories")
+	}
+	if !h.Unattended && len(h.Packages) > 0 && h.OS.Family != model.FamilyArch {
 		a.add(model.SevLow, "updates", "unattended_disabled")
 	}
 }
 
 const maxDetails = 40
 
-func upgradeCommand(binaries []string) string {
+func upgradeCommand(o model.OSInfo, binaries []string) string {
+	switch o.Family {
+	case model.FamilyRPM:
+		tool := "dnf"
+		if o.PkgTool == "yum" {
+			tool = "yum"
+		}
+		return tool + " upgrade " + strings.Join(binaries, " ")
+	case model.FamilySUSE:
+		if o.Rolling() {
+			return "zypper dup"
+		}
+		return "zypper update " + strings.Join(binaries, " ")
+	case model.FamilyArch:
+		return "pacman -Syu"
+	}
 	return "apt-get install --only-upgrade " + strings.Join(binaries, " ")
 }
 
@@ -223,13 +255,19 @@ func annotateVulns(h *model.HostReport) {
 	fixAll := map[string]bool{}
 	for i := range h.Vulns {
 		v := &h.Vulns[i]
-		v.Binaries = bySource[v.Package+"\x00"+v.Version]
-		sort.Strings(v.Binaries)
-		v.Candidate = ""
-		for _, b := range v.Binaries {
-			if c := candidate[b]; c != "" {
-				v.Candidate = c
+		if h.OS.Family == model.FamilyDeb || h.OS.Family == model.FamilySUSE || h.OS.Family == "" {
+			v.Binaries = bySource[v.Package+"\x00"+v.Version]
+			sort.Strings(v.Binaries)
+			v.Candidate = ""
+			for _, b := range v.Binaries {
+				if c := candidate[b]; c != "" {
+					v.Candidate = c
+				}
 			}
+		}
+		v.FixCmd = ""
+		if v.Fixed != "" && len(v.Binaries) > 0 {
+			v.FixCmd = upgradeCommand(h.OS, v.Binaries)
 		}
 		if v.Fixed != "" {
 			for _, b := range v.Binaries {
@@ -247,11 +285,18 @@ func annotateVulns(h *model.HostReport) {
 		all = append(all, b)
 	}
 	sort.Strings(all)
-	h.FixAll = upgradeCommand(all)
+	h.FixAll = upgradeCommand(h.OS, all)
+	if h.OS.Family == model.FamilySUSE {
+		for i := range h.Upgrades {
+			if fixAll[h.Upgrades[i].Name] {
+				h.Upgrades[i].Security = true
+			}
+		}
+	}
 	h.Fix = fixPlan(h, all)
 }
 
-var sensitivePrefixes = []string{"linux-image", "linux-modules", "linux-headers", "libc6", "libc-bin", "systemd", "libsystemd", "openssl", "libssl", "openssh-server", "dbus", "libdbus", "docker", "containerd", "runc", "kubelet", "kubeadm", "grub"}
+var sensitivePrefixes = []string{"linux-image", "linux-modules", "linux-headers", "libc6", "libc-bin", "systemd", "libsystemd", "openssl", "libssl", "openssh-server", "dbus", "libdbus", "docker", "containerd", "runc", "kubelet", "kubeadm", "grub", "kernel", "glibc", "linux", "openssh"}
 
 func isSensitive(pkg string) bool {
 	for _, p := range sensitivePrefixes {
@@ -265,20 +310,15 @@ func isSensitive(pkg string) bool {
 const aptNonInteractive = "sudo env DEBIAN_FRONTEND=noninteractive apt-get install --only-upgrade -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold "
 
 func fixPlan(h *model.HostReport, pkgs []string) *model.FixPlan {
-	p := &model.FixPlan{Packages: pkgs}
+	p := &model.FixPlan{Packages: pkgs, Family: h.OS.Family}
+	if p.Family == "" {
+		p.Family = model.FamilyDeb
+	}
 	for _, b := range pkgs {
 		if isSensitive(b) {
 			p.Sensitive = append(p.Sensitive, b)
 		}
 	}
-	for _, v := range h.Vulns {
-		if v.Fixed != "" && v.Candidate == "" {
-			p.NotInApt++
-		}
-	}
-	list := strings.Join(pkgs, " ")
-	p.Command = "sudo apt-get update && " + aptNonInteractive + list
-	p.Simulate = "sudo apt-get update && apt-get -s install --only-upgrade " + list
 	seen := map[string]bool{}
 	for _, u := range h.Upgrades {
 		if u.Security && !seen[u.Name] {
@@ -287,13 +327,63 @@ func fixPlan(h *model.HostReport, pkgs []string) *model.FixPlan {
 		}
 	}
 	sort.Strings(p.Security)
-	if len(p.Security) > 0 {
-		p.SecurityCommand = "sudo apt-get update && " + aptNonInteractive + strings.Join(p.Security, " ")
-	}
-	p.After = []string{
-		"command -v needrestart >/dev/null && sudo needrestart -r l",
-		"[ -f /var/run/reboot-required ] && cat /var/run/reboot-required.pkgs || echo 'no reboot required'",
-		"systemctl --failed",
+	list := strings.Join(pkgs, " ")
+	switch p.Family {
+	case model.FamilyRPM:
+		tool := "dnf"
+		if h.OS.PkgTool == "yum" {
+			tool = "yum"
+		}
+		p.Command = "sudo " + tool + " -y upgrade " + list
+		p.Simulate = "sudo " + tool + " upgrade --assumeno " + list
+		if len(p.Security) > 0 {
+			p.SecurityCommand = "sudo " + tool + " -y upgrade --security"
+		}
+		restart := "sudo dnf needs-restarting"
+		if tool == "yum" {
+			restart = "sudo needs-restarting"
+		}
+		p.After = []string{restart + " -r", restart + " -s", "systemctl --failed"}
+	case model.FamilySUSE:
+		if h.OS.Rolling() {
+			p.Rolling = true
+			p.Command = "sudo zypper -n refresh && sudo zypper -n dup"
+			p.Simulate = "sudo zypper -n refresh && sudo zypper -n dup --dry-run"
+		} else {
+			p.Command = "sudo zypper -n refresh && sudo zypper -n update " + list
+			p.Simulate = "sudo zypper -n refresh && sudo zypper -n update --dry-run " + list
+			if len(p.Security) > 0 {
+				p.SecurityCommand = "sudo zypper -n refresh && sudo zypper -n patch --category security"
+			}
+		}
+		p.After = []string{
+			"sudo zypper needs-rebooting",
+			"sudo zypper ps -s",
+			"systemctl --failed",
+		}
+	case model.FamilyArch:
+		p.Command = "sudo pacman -Syu"
+		p.Simulate = "checkupdates"
+		p.After = []string{
+			"[ -d /usr/lib/modules/$(uname -r) ] && echo 'no reboot required' || echo 'reboot required: the running kernel was upgraded'",
+			"systemctl --failed",
+		}
+	default:
+		for _, v := range h.Vulns {
+			if v.Fixed != "" && v.Candidate == "" {
+				p.NotInApt++
+			}
+		}
+		p.Command = "sudo apt-get update && " + aptNonInteractive + list
+		p.Simulate = "sudo apt-get update && apt-get -s install --only-upgrade " + list
+		if len(p.Security) > 0 {
+			p.SecurityCommand = "sudo apt-get update && " + aptNonInteractive + strings.Join(p.Security, " ")
+		}
+		p.After = []string{
+			"command -v needrestart >/dev/null && sudo needrestart -r l",
+			"[ -f /var/run/reboot-required ] && cat /var/run/reboot-required.pkgs || echo 'no reboot required'",
+			"systemctl --failed",
+		}
 	}
 	return p
 }
@@ -341,8 +431,8 @@ func vulnDetails(list []model.Vuln) []string {
 			break
 		}
 		line := fmt.Sprintf("%s · %s %s → %s", v.ID, v.Package, v.Version, v.Fixed)
-		if len(v.Binaries) > 0 {
-			line += " · " + upgradeCommand(v.Binaries)
+		if v.FixCmd != "" {
+			line += " · " + v.FixCmd
 		}
 		out = append(out, line)
 	}
@@ -350,7 +440,6 @@ func vulnDetails(list []model.Vuln) []string {
 }
 
 func vulns(a adder, h *model.HostReport) {
-	annotateVulns(h)
 	var crit, high, other []model.Vuln
 	var unfixed []model.Vuln
 	for _, v := range h.Vulns {
@@ -447,6 +536,9 @@ func network(a adder, h *model.HostReport, t inventory.Thresholds) {
 	active := false
 	for _, l := range h.Firewall {
 		if strings.HasPrefix(l, "Status: active") {
+			active = true
+		}
+		if l == "firewalld=running" {
 			active = true
 		}
 		if k, v, ok := strings.Cut(l, "="); ok && (k == "nft_rules" || k == "iptables_rules") {

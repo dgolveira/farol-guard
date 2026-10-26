@@ -31,6 +31,15 @@ jobs:
         run: |
           scripts/build-deb.sh --version "$(cat VERSION)" --arch amd64
           dpkg-deb -I dist/farol-guard_*_amd64.deb
+          for arch in amd64 arm64; do
+            install -Dm755 dist/farol-linux-$arch dist/nfpm/farol
+            for kind in rpm archlinux; do
+              docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/src -w /src -e FAROL_ARCH=$arch -e FAROL_VERSION="$(cat VERSION)" \
+                docker.io/goreleaser/nfpm:v2.47.0 package -f packaging/nfpm/nfpm.yaml -p $kind -t dist/
+            done
+          done
+          rm -rf dist/nfpm
+          ls -l dist/*.rpm dist/*.pkg.tar.zst
 
   govulncheck:
     runs-on: ubuntu-24.04

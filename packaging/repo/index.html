@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>farol-guard packages</title>
+<style>
+:root { --bg: #FBFBFA; --fg: #111111; --muted: #6B6A67; --line: #EAEAEA; --code: #FFFFFF; }
+@media (prefers-color-scheme: dark) { :root { --bg: #191919; --fg: #EDEDEC; --muted: #9B9A97; --line: #2F2F2F; --code: #202020; } }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 system-ui, sans-serif; }
+main { max-width: 820px; margin: 0 auto; padding: 48px 16px 80px; }
+h1 { font: 400 36px/1.2 Georgia, serif; margin: 0 0 8px; }
+h2 { font-size: 17px; margin: 36px 0 10px; }
+p { color: var(--muted); }
+pre { background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font: 13px/1.6 ui-monospace, monospace; }
+code { font-family: ui-monospace, monospace; }
+a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+<h1>farol-guard packages</h1>
+<p>Signed package repositories for <a href="https://github.com/dgolveira/farol-guard">farol-guard</a>, amd64 and arm64.
+Release key fingerprint: <code>@FINGERPRINT@</code> (<a href="farol-guard.asc">farol-guard.asc</a>).</p>
+
+<h2>Debian, Ubuntu and derivatives (apt)</h2>
+<pre>curl -fsSL @BASE_URL@/apt/farol-guard.gpg | sudo tee /usr/share/keyrings/farol-guard.gpg &gt;/dev/null
+echo "deb [signed-by=/usr/share/keyrings/farol-guard.gpg] @BASE_URL@/apt stable main" | sudo tee /etc/apt/sources.list.d/farol-guard.list
+sudo apt update &amp;&amp; sudo apt install farol-guard</pre>
+
+<h2>Fedora, RHEL, Rocky, AlmaLinux, Oracle Linux, Amazon Linux (dnf)</h2>
+<pre>sudo curl -fsSL -o /etc/yum.repos.d/farol-guard.repo @BASE_URL@/rpm/farol-guard.repo
+sudo dnf install farol-guard</pre>
+
+<h2>openSUSE and SLES (zypper)</h2>
+<pre>sudo rpm --import @BASE_URL@/farol-guard.asc
+sudo zypper addrepo --gpgcheck '@BASE_URL@/rpm/$basearch' farol-guard
+sudo zypper install farol-guard</pre>
+
+<h2>Arch, Manjaro, EndeavourOS (pacman)</h2>
+<pre>curl -fsSL @BASE_URL@/farol-guard.asc | sudo pacman-key --add -
+sudo pacman-key --lsign-key @FINGERPRINT@
+printf '\n[farol-guard]\nServer = @BASE_URL@/arch/$arch\n' | sudo tee -a /etc/pacman.conf
+sudo pacman -Syu farol-guard</pre>
+
+<p>Release files and checksums: <a href="https://github.com/dgolveira/farol-guard/releases">GitHub releases</a>.
+Verify a download with <code>gpg --verify SHA256SUMS.asc SHA256SUMS &amp;&amp; sha256sum -c SHA256SUMS --ignore-missing</code>.</p>
+</main>
+</body>
+</html>

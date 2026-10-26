@@ -11,8 +11,8 @@ farol-guard is **agentless** and **public-key only**:
   is not supported** and farol-guard never stores SSH passwords.
 - For a complete audit the login user must be `root` or have passwordless
   `sudo` (`sudo -n`). Without it the check still runs, but users of other
-  accounts, `/etc/shadow`, the effective `sshd` configuration and
-  `apt-get update` are skipped and the report marks the collection as limited.
+  accounts, `/etc/shadow`, the effective `sshd` configuration and the package
+  metadata refresh are skipped and the report marks the collection as limited.
 - Host keys are verified against `known_hosts`. Unknown hosts must be trusted
   explicitly (dashboard, interactive prompt or `--accept-new`).
 
@@ -142,9 +142,12 @@ Settings cascade `defaults -> group -> host`. The dashboard edits the same file
 
 | Target | Status |
 | --- | --- |
-| Debian 10 to 13 | supported |
-| Ubuntu 18.04 to 26.04 (LTS and interim) | supported |
+| Debian 10 to 13, Ubuntu 18.04 to 26.04 and their derivatives | supported (CVEs from OSV.dev) |
+| RHEL, Rocky, AlmaLinux, Oracle Linux, Amazon Linux 2023, Fedora | supported (CVEs from the host's dnf security advisories) |
+| CentOS Stream | supported, without CVEs (no security advisories published) |
+| Arch, Manjaro, EndeavourOS | supported (CVEs from the Arch Linux security tracker) |
 | Other Linux distributions | collection works partially; updates and CVEs are not evaluated |
 
-The machine running farol-guard can be any Linux (amd64 or arm64). The `.deb`
-targets Debian and Ubuntu; a container image is also available.
+The machine running farol-guard can be any Linux (amd64 or arm64): `.deb`,
+`.rpm` and Arch packages, a container image, or a build from source. See
+[supported platforms](platforms.md).

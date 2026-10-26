@@ -5,3 +5,4 @@ farol-report-*
 test/lab/inventory.yaml
 *.bak
 *.tmp
+test/vm/inventory.yaml

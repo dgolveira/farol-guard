@@ -69,10 +69,11 @@ Installed-Size: $installed_kb
 Recommends: openssh-client, xdg-utils
 Maintainer: Douglas Oliveira <contato@dgoliveira.com.br>
 Homepage: https://github.com/dgolveira/farol-guard
-Description: Agentless SSH auditor for Debian and Ubuntu server fleets
- farol-guard connects to your servers over SSH and audits users, root
- accounts, authorized keys, sshd configuration, pending and security
- updates, CVEs (via OSV.dev), SSH access by IP, network errors, disks,
+Description: Agentless SSH auditor for Linux server fleets
+ farol-guard connects to Debian, Ubuntu, RHEL family, Fedora, Amazon Linux
+ and Arch servers over SSH and audits users, root accounts, authorized
+ keys, sshd configuration, pending and security updates, CVEs, SSH
+ access by IP, network errors, disks,
  memory and CPU. It produces HTML/JSON/Markdown reports, serves a local
  web dashboard and rotates SSH keys with verification and rollback.
 CONTROL

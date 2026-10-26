@@ -3,7 +3,10 @@
 # Script Name: setup.sh
 # Description: Creates the farol-guard development lab: a throwaway SSH key in
 #              .cache/lab, a lab inventory (test/lab/inventory.yaml) and the
-#              Debian/Ubuntu sshd containers from docker-compose.yml.
+#              sshd containers from docker-compose.yml: Debian, Ubuntu,
+#              Linux Mint, Rocky, Alma, CentOS Stream, CentOS 7, Fedora,
+#              Oracle Linux, Amazon Linux 2 and 2023, openSUSE Leap and
+#              Tumbleweed, and Arch.
 # Author:      Douglas Oliveira <contato@dgoliveira.com.br>
 # Role:        Infrastructure Analyst
 # Created:     2026-10-23
@@ -55,6 +58,50 @@ groups:
       - name: offline01
         address: 127.0.0.1
         port: 2299
+      - name: mint22
+        address: 127.0.0.1
+        port: 2204
+  lab-rhel:
+    hosts:
+      - name: rocky9
+        address: 127.0.0.1
+        port: 2205
+      - name: alma9
+        address: 127.0.0.1
+        port: 2206
+      - name: centos9
+        address: 127.0.0.1
+        port: 2207
+      - name: fedora
+        address: 127.0.0.1
+        port: 2208
+        user: deploy
+      - name: oracle9
+        address: 127.0.0.1
+        port: 2209
+      - name: amazon2023
+        address: 127.0.0.1
+        port: 2210
+      - name: amazon2
+        address: 127.0.0.1
+        port: 2212
+      - name: centos7
+        address: 127.0.0.1
+        port: 2213
+  lab-suse:
+    hosts:
+      - name: leap16
+        address: 127.0.0.1
+        port: 2214
+      - name: tumbleweed
+        address: 127.0.0.1
+        port: 2215
+        user: deploy
+  lab-arch:
+    hosts:
+      - name: arch
+        address: 127.0.0.1
+        port: 2211
 YAML
 
 docker compose -f "$lab_dir/docker-compose.yml" up -d --build
