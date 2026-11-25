@@ -6,6 +6,62 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-25
+
+### Fixed
+
+- Removing a key from the "Keys found in the fleet" list tried every listed
+  user on every listed host (for a key on `cerberus:opc`, `gc:root` and
+  `zabbix:root` it also tried `opc` on gc and zabbix and `root` on cerberus),
+  which reported false failures such as "user opc not found" and could touch
+  users that were never shown in the dialog. The dialog now sends the exact
+  host:user pairs (`targets`) and only those are changed.
+
+### Added
+
+- Pending removal flag: after a real removal, the host:user pairs where the key
+  is gone are kept in `removals.json` in the config directory and shown struck
+  through, with a "Removed" badge when every pair is done (the hint explains the
+  list refreshes on the next check). The
+  list only comes from the latest report, so before this the key stayed there
+  as if nothing had happened until the next check. The next check confirms it;
+  if the key is still on the host it shows up as normal again. Pairs whose
+  removal was rolled back are not flagged.
+- The "Where" column of the fleet keys list groups the key by host and shows
+  the user accounts that hold it under each host, with a host/user count, so it
+  is clear whose `authorized_keys` has it. The previous `host:user` chips read
+  like `host:port`.
+- The remove dialog lists every host/user pair in a table with a checkbox each,
+  so you see exactly which users lose the key and can remove it from only some
+  of them. The button shows how many users are selected.
+- "Install on more hosts" for the app key now lists the inventory hosts that do
+  not have it yet (pre-selected), the ones with no data in the latest check
+  (not selected) and, folded, the ones that already have it, with the login
+  user and the key farol-guard uses on each. Before, it showed the generic
+  group/host picker and you had to work out from the inventory which hosts
+  were missing. New endpoint `GET /api/keys/app-status`; a host counts as
+  installed when the latest report shows the key for its login user or the
+  inventory already logs in with it.
+- Option to switch the inventory login key of the hosts where the app key was
+  installed, so it no longer has to be changed host by host in the inventory.
+- Hosts where the app key was just installed show as "Already installed" right
+  away (kept in `installs.json` until the next check), instead of staying under
+  "Without the app key" until a new check. The dry run now also shows the
+  inventory step (`inventory DRY-RUN would switch the login key to farol-app`)
+  when the login key option is checked, and the real run logs it per host.
+- "Defaults" editor on the Inventory page for the inventory-wide user, port and
+  login key (`defaults`), with any existing key or a custom path. It lists the
+  hosts the change would affect (those inheriting the default) and can test the
+  login on them before saving; if any would lose access, saving needs a second
+  "Save anyway" click. Before, the default key could only be changed in the
+  YAML or set to the app key from the app key dialog. New endpoints
+  `POST /api/inventory/defaults/check` and `PUT /api/inventory/defaults`.
+
+### Removed
+
+- "Make it the default identity of the inventory" from the app key dialog; the
+  inventory defaults editor replaces it. The CLI `--set-default` flag stays.
+
 ## [1.1.0] - 2026-10-26
 
 ### Fixed

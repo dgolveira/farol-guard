@@ -143,6 +143,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/reports/{id}", s.handleReportDelete)
 	mux.HandleFunc("DELETE /api/reports", s.handleReportsClear)
 	s.registerKeyRoutes(mux)
+	s.registerDefaultsRoutes(mux)
 	mux.HandleFunc("GET /ui/fleet", s.handleFleetFragment)
 	mux.HandleFunc("GET /ui/host/{name}", s.handleHostFragment)
 	return s.guard(mux)

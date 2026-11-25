@@ -191,3 +191,14 @@ details.scope-pop, details.scope-pop:first-of-type { border: 0; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; transition: none; } }
 .fix-modal { padding: 0; }
+.chip.removed { text-decoration: line-through; opacity: .55; }
+.use-list { display: grid; gap: 4px; margin-top: 4px; }
+.use-host { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.use-host-name { font-weight: 600; white-space: nowrap; }
+.use-host-name::after { content: ":"; opacity: .5; }
+.rm-table th:first-child, .rm-table td:first-child { width: 28px; }
+.rm-table tr.removed td:nth-child(2), .rm-table tr.removed td:nth-child(3) { text-decoration: line-through; opacity: .55; }
+.app-sec { font-size: 13px; margin: 18px 0 6px; }
+.app-installed { margin: 14px 0; }
+.app-installed summary { cursor: pointer; }
+.app-installed .chips { flex-wrap: wrap; margin-top: 8px; }

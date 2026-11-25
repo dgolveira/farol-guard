@@ -95,10 +95,10 @@ commands for each distribution: <https://dgolveira.github.io/farol-guard/>.
 **Packages** (from the [releases](https://github.com/dgolveira/farol-guard/releases), amd64 and arm64):
 
 ```bash
-sudo apt install ./farol-guard_1.1.0_amd64.deb                 # Debian, Ubuntu, Mint, Pop!_OS...
-sudo dnf install ./farol-guard-1.1.0-1.x86_64.rpm              # Fedora, RHEL, Rocky, Alma, Oracle, Amazon Linux
-sudo zypper install --allow-unsigned-rpm ./farol-guard-1.1.0-1.x86_64.rpm   # openSUSE
-sudo pacman -U ./farol-guard-1.1.0-1-x86_64.pkg.tar.zst        # Arch, Manjaro, EndeavourOS
+sudo apt install ./farol-guard_1.1.1_amd64.deb                 # Debian, Ubuntu, Mint, Pop!_OS...
+sudo dnf install ./farol-guard-1.1.1-1.x86_64.rpm              # Fedora, RHEL, Rocky, Alma, Oracle, Amazon Linux
+sudo zypper install --allow-unsigned-rpm ./farol-guard-1.1.1-1.x86_64.rpm   # openSUSE
+sudo pacman -U ./farol-guard-1.1.1-1-x86_64.pkg.tar.zst        # Arch, Manjaro, EndeavourOS
 farol version
 ```
 
@@ -110,7 +110,7 @@ for a daily check and for the dashboard (disabled by default).
 **Container image** ([GitHub Container Registry](https://github.com/dgolveira/farol-guard/pkgs/container/farol-guard), amd64 and arm64):
 
 ```bash
-docker run --rm ghcr.io/dgolveira/farol-guard:1.1.0 version
+docker run --rm ghcr.io/dgolveira/farol-guard:1.1.1 version
 ```
 
 See [container image](docs/container.md), [deploy/docker](deploy/docker) and [hosting](docs/hosting.md).

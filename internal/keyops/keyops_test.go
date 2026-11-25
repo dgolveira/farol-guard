@@ -1,6 +1,11 @@
 package keyops
 
-import "testing"
+import (
+	"slices"
+	"testing"
+
+	"github.com/dgolveira/farol-guard/internal/inventory"
+)
 
 const (
 	keyA = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOyIKCyDSiLT9NFPR3SZXkJB5iMCcl1KXO0prJete1y8 a@x"
@@ -28,5 +33,28 @@ func TestValidateRejectsUnsafeInput(t *testing.T) {
 		if err := r.Validate(); err == nil {
 			t.Fatalf("expected error for %+v", r)
 		}
+	}
+}
+
+func TestUsersForTargetsArePerHost(t *testing.T) {
+	req := Request{Users: []string{"opc", "root"}, Targets: map[string][]string{"a": {"opc"}, "b": {"root"}}}
+	if got := req.usersFor(inventory.Host{Name: "a", User: "root"}); !slices.Equal(got, []string{"opc"}) {
+		t.Fatalf("host a: %q", got)
+	}
+	if got := req.usersFor(inventory.Host{Name: "b", User: "ubuntu"}); !slices.Equal(got, []string{"root"}) {
+		t.Fatalf("host b: %q", got)
+	}
+	if got := req.usersFor(inventory.Host{Name: "c", User: "root"}); len(got) != 0 {
+		t.Fatalf("host c: %q", got)
+	}
+	if got := (&Request{}).usersFor(inventory.Host{Name: "a", User: "root"}); !slices.Equal(got, []string{"root"}) {
+		t.Fatalf("default: %q", got)
+	}
+}
+
+func TestValidateRejectsUnsafeTargetUser(t *testing.T) {
+	r := Request{DryRun: true, Targets: map[string][]string{"a": {"root; id"}}}
+	if err := r.Validate(); err == nil {
+		t.Fatal("expected error")
 	}
 }

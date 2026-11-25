@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
+	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/dgolveira/farol-guard/internal/history"
 	"github.com/dgolveira/farol-guard/internal/i18n"
@@ -16,8 +19,9 @@ import (
 )
 
 type keyUse struct {
-	Host string `json:"host"`
-	User string `json:"user"`
+	Host    string `json:"host"`
+	User    string `json:"user"`
+	Removed bool   `json:"removed,omitempty"`
 }
 
 type fleetKey struct {
@@ -28,6 +32,7 @@ type fleetKey struct {
 	Type        string   `json:"type"`
 	Comment     string   `json:"comment"`
 	Where       []keyUse `json:"where"`
+	Removed     bool     `json:"removed,omitempty"`
 }
 
 type keyOpRequest struct {
@@ -36,6 +41,7 @@ type keyOpRequest struct {
 	Groups        []string `json:"groups"`
 	Hosts         []string `json:"hosts"`
 	Users         []string `json:"users"`
+	Targets       []keyUse `json:"targets"`
 	From          []string `json:"from"`
 	Fingerprint   string   `json:"fingerprint"`
 	RemoveCurrent bool     `json:"remove_current"`
@@ -53,6 +59,7 @@ func (s *Server) registerKeyRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/keys/remove", s.handleKeyRemove)
 	mux.HandleFunc("POST /api/keys/app-init", s.handleAppInit)
 	mux.HandleFunc("GET /api/keys/app-hosts", s.handleAppHosts)
+	mux.HandleFunc("GET /api/keys/app-status", s.handleAppStatus)
 	mux.HandleFunc("POST /api/keys/app-protect", s.handleAppProtect)
 	mux.HandleFunc("POST /api/keys/app-rotate", s.handleAppRotate)
 }
@@ -75,6 +82,7 @@ func (s *Server) handleKeys(w http.ResponseWriter, r *http.Request) {
 	reportID := ""
 	if rep, id, err := s.loadReport("latest", i18n.EN); err == nil && rep != nil {
 		reportID = id
+		gone := pendingRemovals(rep.GeneratedAt)
 		m := map[string]*fleetKey{}
 		for _, h := range rep.Hosts {
 			for _, u := range h.Users {
@@ -85,7 +93,16 @@ func (s *Server) handleKeys(w http.ResponseWriter, r *http.Request) {
 						m[k.Fingerprint] = fk
 						fleet = append(fleet, fk)
 					}
-					fk.Where = append(fk.Where, keyUse{Host: h.Name, User: u.Name})
+					fk.Where = append(fk.Where, keyUse{Host: h.Name, User: u.Name, Removed: gone[removalKey(k.Fingerprint, h.Name, u.Name)]})
+				}
+			}
+		}
+		for _, fk := range fleet {
+			fk.Removed = true
+			for _, w := range fk.Where {
+				if !w.Removed {
+					fk.Removed = false
+					break
 				}
 			}
 		}
@@ -125,6 +142,11 @@ func decodeKeyOp(w http.ResponseWriter, r *http.Request) (*keyOpRequest, bool) {
 		writeErr(w, http.StatusBadRequest, err)
 		return nil, false
 	}
+	for _, t := range req.Targets {
+		if !containsString(req.Hosts, t.Host) {
+			req.Hosts = append(req.Hosts, t.Host)
+		}
+	}
 	if len(req.Groups) == 0 && len(req.Hosts) == 0 {
 		writeErr(w, http.StatusBadRequest, errors.New("select at least one group or host"))
 		return nil, false
@@ -143,6 +165,14 @@ func (s *Server) prepareKeyOp(req *keyOpRequest, needKey bool) (*inventory.Inven
 	}
 	op := keyops.Request{Hosts: hosts, Users: req.Users, FromIPs: req.From, DryRun: req.DryRun,
 		RemoveFP: req.Fingerprint, RemoveCur: req.RemoveCurrent}
+	if len(req.Targets) > 0 {
+		op.Targets = map[string][]string{}
+		for _, t := range req.Targets {
+			if !containsString(op.Targets[t.Host], t.User) {
+				op.Targets[t.Host] = append(op.Targets[t.Host], t.User)
+			}
+		}
+	}
 	if req.Key != "" {
 		k, err := keys.Get(req.Key)
 		if err != nil {
@@ -166,6 +196,33 @@ func (s *Server) prepareKeyOp(req *keyOpRequest, needKey bool) (*inventory.Inven
 		return nil, op, errors.New("choose a key")
 	}
 	return inv, op, nil
+}
+
+func noteIdentitySwitch(results []keyops.Result, good []inventory.Host, dryRun bool) {
+	user := map[string]string{}
+	for _, h := range good {
+		user[h.Name] = h.User
+	}
+	for i := range results {
+		u, ok := user[results[i].Host]
+		if !ok {
+			continue
+		}
+		e := keyops.Event{User: u, Action: "inventory", Status: keyops.StatusOK, Message: "login key switched to " + keys.AppKeyName}
+		if dryRun {
+			e.Status, e.Message = keyops.StatusDryRun, "[DRY-RUN] would switch the login key to "+keys.AppKeyName
+		}
+		results[i].Events = append(results[i].Events, e)
+	}
+}
+
+func containsString(list []string, v string) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
 }
 
 func goodHosts(hosts []inventory.Host, results []keyops.Result) []inventory.Host {
@@ -234,6 +291,15 @@ func (s *Server) handleKeyRemove(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
+	if !req.DryRun && !req.RemoveCurrent && req.Fingerprint != "" {
+		var since time.Time
+		if rep, _, err := s.loadReport("latest", i18n.EN); err == nil && rep != nil {
+			since = rep.GeneratedAt
+		}
+		if err := recordRemovals(req.Fingerprint, results, since); err != nil {
+			log.Printf("record pending key removals: %v", err)
+		}
+	}
 	if !req.DryRun && op.NewKey != nil {
 		if good := goodHosts(op.Hosts, results); len(good) > 0 {
 			inv.AddKnownKey(op.NewKey.Name, op.NewKey.Fingerprint)
@@ -284,8 +350,22 @@ func (s *Server) handleAppInit(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
+	good := goodHosts(op.Hosts, results)
+	if req.SetIdentity {
+		noteIdentitySwitch(results, good, req.DryRun)
+	}
 	if !req.DryRun {
+		var pairs [][2]string
+		for _, h := range good {
+			pairs = append(pairs, [2]string{h.Name, h.User})
+		}
+		if err := recordChanges(installsPath(), op.NewKey.Fingerprint, pairs, latestReportTime()); err != nil {
+			log.Printf("record app key installs: %v", err)
+		}
 		inv.AddKnownKey(keys.AppKeyName, op.NewKey.Fingerprint)
+		if req.SetIdentity && len(good) > 0 {
+			inv.SetIdentity(good, op.NewKey.Path)
+		}
 		if req.SetDefault {
 			inv.Defaults.Identity = op.NewKey.Path
 		}
@@ -306,19 +386,79 @@ func (s *Server) appKeyHosts() (*inventory.Inventory, []inventory.Host, error) {
 	if err != nil {
 		return inv, nil, nil
 	}
-	present := map[string]bool{}
+	present, _ := appKeyPresence(app.Fingerprint)
+	return inv, keyops.AppKeyHosts(inv, present), nil
+}
+
+func latestReportTime() time.Time {
 	if rep, _, err := history.Latest(); err == nil && rep != nil {
-		for _, h := range rep.Hosts {
-			for _, u := range h.Users {
-				for _, k := range u.Keys {
-					if k.Fingerprint == app.Fingerprint && u.Name == h.User {
-						present[h.Name] = true
-					}
+		return rep.GeneratedAt
+	}
+	return time.Time{}
+}
+
+func appKeyPresence(fp string) (present, seen map[string]bool) {
+	present, seen = map[string]bool{}, map[string]bool{}
+	rep, _, err := history.Latest()
+	var since time.Time
+	if err == nil && rep != nil {
+		since = rep.GeneratedAt
+	}
+	installs, _ := loadChanges(installsPath())
+	for _, r := range installs {
+		if r.Fingerprint == fp && r.At.After(since) {
+			present[r.Host], seen[r.Host] = true, true
+		}
+	}
+	if rep == nil {
+		return present, seen
+	}
+	for _, h := range rep.Hosts {
+		if h.Reachable {
+			seen[h.Name] = true
+		}
+		for _, u := range h.Users {
+			for _, k := range u.Keys {
+				if k.Fingerprint == fp && u.Name == h.User {
+					present[h.Name] = true
 				}
 			}
 		}
 	}
-	return inv, keyops.AppKeyHosts(inv, present), nil
+	return present, seen
+}
+
+type appHostStatus struct {
+	Name     string `json:"name"`
+	Group    string `json:"group"`
+	User     string `json:"user"`
+	Identity string `json:"identity"`
+	State    string `json:"state"`
+}
+
+func (s *Server) handleAppStatus(w http.ResponseWriter, r *http.Request) {
+	inv, err := s.loadInventory()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	appPath, present, seen := "", map[string]bool{}, map[string]bool{}
+	if app, err := keys.Get(keys.AppKeyName); err == nil {
+		appPath = app.Path
+		present, seen = appKeyPresence(app.Fingerprint)
+	}
+	out := []appHostStatus{}
+	for _, h := range inv.Hosts() {
+		st := appHostStatus{Name: h.Name, Group: h.Group, User: h.User, Identity: filepath.Base(h.Identity), State: "missing"}
+		switch {
+		case appPath != "" && (present[h.Name] || h.Identity == appPath):
+			st.State = "installed"
+		case appPath != "" && !seen[h.Name]:
+			st.State = "unknown"
+		}
+		out = append(out, st)
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) handleAppHosts(w http.ResponseWriter, r *http.Request) {

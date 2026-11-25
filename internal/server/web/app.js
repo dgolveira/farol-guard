@@ -509,6 +509,7 @@ async function renderInventory() {
     </header>
     ${agentNotice()}
     <div class="section-head"><div class="meta" id="inv-count"></div>
+      <button class="ghost" id="inv-defaults" type="button">${esc(t("ui.def.open"))}</button>
       <button id="add-host" type="button">${esc(t("ui.inv.add"))}</button></div>
     ${hosts.length ? `
     <div class="filters card">
@@ -534,6 +535,7 @@ async function renderInventory() {
     : `<div class="empty"><p class="meta">${esc(t("ui.inv.empty"))}</p></div>`}`;
 
   document.getElementById("add-host").addEventListener("click", () => hostForm(null));
+  document.getElementById("inv-defaults").addEventListener("click", () => defaultsDialog());
   view.querySelectorAll("tr[data-host]").forEach(tr => {
     const name = tr.dataset.host;
     const host = hosts.find(h => h.name === name);
@@ -626,6 +628,108 @@ function nextName(value, taken) {
   let next = bump(value);
   for (let i = 0; i < 100 && taken.has(next); i++) next = bump(next);
   return next;
+}
+
+async function defaultsDialog() {
+  const d = state.inv.defaults || {};
+  const ids = await api("/api/identities").catch(() => []);
+  const known = ids.some(i => i.path === d.identity);
+  dialog.innerHTML = `
+    <form class="dlg dlg-wide" id="def-form">
+      <h2>${esc(t("ui.def.title"))}</h2>
+      <p class="meta">${esc(t("ui.def.body"))}</p>
+      <div class="grid2">
+        <label class="field">${esc(t("ui.f.user"))}<input type="text" name="user" required value="${esc(d.user)}" class="mono-input"></label>
+        <label class="field">${esc(t("ui.f.port"))}<input type="number" name="port" min="1" max="65535" required value="${esc(d.port || 22)}"></label>
+      </div>
+      <label class="field">${esc(t("ui.f.identity"))}
+        <select name="identity_sel" id="def-id-sel">
+          ${ids.map(i => `<option value="${esc(i.path)}"${i.path === d.identity ? " selected" : ""}>${esc(identityLabel(i))}</option>`).join("")}
+          <option value="__custom"${known ? "" : " selected"}>${esc(t("ui.id.custom"))}</option>
+        </select>
+      </label>
+      <input type="text" class="mono-input" name="identity_custom" id="def-id-custom" placeholder="~/.ssh/id_ed25519" value="${esc(known ? "" : d.identity)}"${known ? " hidden" : ""}>
+      <div id="def-impact"></div>
+      <div class="status-line" id="def-status"></div>
+      <div class="status-line err" id="def-err"></div>
+      <div class="foot">
+        <button type="button" class="ghost" id="def-close">${esc(t("ui.close"))}</button>
+        <button type="button" class="ghost" id="def-test">${esc(t("ui.def.test"))}</button>
+        <button type="submit" id="def-save">${esc(t("ui.inv.save"))}</button>
+      </div>
+    </form>`;
+  dialog.showModal();
+  const form = document.getElementById("def-form");
+  const sel = document.getElementById("def-id-sel");
+  const custom = document.getElementById("def-id-custom");
+  const impactBox = document.getElementById("def-impact");
+  const errBox = document.getElementById("def-err");
+  const st = document.getElementById("def-status");
+  const settings = () => {
+    const f = new FormData(form);
+    return { user: f.get("user").trim(), port: Number(f.get("port")) || 0,
+      identity: (f.get("identity_sel") === "__custom" ? f.get("identity_custom") : f.get("identity_sel")).trim() };
+  };
+  let tested = null, armed = null, lastList = [];
+  const impactHTML = (list, ran) => {
+    if (!list.length) return `<p class="note">${esc(t("ui.def.noimpact"))}</p>`;
+    const fails = list.filter(h => h.tested && !h.ok).length;
+    const rows = list.map(h => `<tr><td class="nowrap">${esc(h.name)}</td><td class="meta nowrap">${esc(h.group)}</td>
+      <td class="mono nowrap">${esc(h.user)}<span class="meta"> :${esc(h.port)}</span></td><td class="mono nowrap">${esc(String(h.identity).split("/").pop())}</td>
+      <td>${h.tested ? `<span class="badge ${h.ok ? "ok" : "critical"}" title="${esc(h.error || "")}">${esc(h.ok ? "ok" : (h.reason || t("ui.res.fail")))}</span>` : ""}</td></tr>`).join("");
+    return `<h3 class="app-sec">${esc(t("ui.def.impact", list.length))}</h3>
+      ${ran && fails ? `<div class="notice">${esc(t("ui.def.fails", fails))}</div>` : ""}
+      <div class="table-wrap"><table class="rm-table"><thead><tr><th>Host</th><th>${esc(t("ui.f.group"))}</th><th>${esc(t("c.user"))}</th><th>${esc(t("ui.keys.app.loginkey"))}</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
+  };
+  const preview = async (test, btn) => {
+    errBox.textContent = "";
+    const body = { settings: settings(), test };
+    const run = () => api("/api/inventory/defaults/check", { method: "POST", body });
+    try {
+      const res = test ? await busy(btn, run, st, t("ui.def.testing")) : await run();
+      impactBox.innerHTML = impactHTML(res.hosts || [], test);
+      tested = test ? JSON.stringify(body.settings) : null;
+      lastList = res.hosts || [];
+      return lastList;
+    } catch (e) { errBox.textContent = e.message; impactBox.innerHTML = ""; return null; }
+  };
+  let timer = null;
+  const refresh = () => {
+    clearTimeout(timer);
+    tested = armed = null;
+    const b = document.getElementById("def-save");
+    b.textContent = t("ui.inv.save");
+    b.classList.remove("danger");
+    timer = setTimeout(() => preview(false), 300);
+  };
+  sel.addEventListener("change", () => { custom.hidden = sel.value !== "__custom"; refresh(); });
+  form.querySelectorAll("input").forEach(i => i.addEventListener("input", refresh));
+  document.getElementById("def-close").addEventListener("click", () => dialog.close());
+  document.getElementById("def-test").addEventListener("click", ev => preview(true, ev.currentTarget));
+  form.addEventListener("submit", async ev => {
+    ev.preventDefault();
+    const btn = document.getElementById("def-save");
+    const body = { settings: settings() };
+    const key = JSON.stringify(body.settings);
+    if (armed !== key) {
+      const list = tested === key ? lastList : await preview(true, btn);
+      if (!list) return;
+      if (list.some(h => !h.ok)) {
+        armed = key;
+        btn.textContent = t("ui.def.saveanyway");
+        btn.classList.add("danger");
+        return;
+      }
+    }
+    try {
+      await busy(btn, () => api("/api/inventory/defaults", { method: "PUT", body }), st, "");
+      dialog.close();
+      state.inv = null;
+      await renderInventory();
+    } catch (e) { errBox.textContent = e.message; }
+  });
+  preview(false);
 }
 
 async function hostForm(source, clone = false) {
@@ -993,8 +1097,10 @@ async function renderKeys() {
     <tr>
       <td class="mono nowrap" title="${esc(f.fingerprint)}">${esc(f.fingerprint.slice(0, 22))}&hellip;<div class="meta">${esc(f.type)}</div></td>
       <td>${farolBadge(f)}<div class="meta mono">${esc(f.comment)}</div></td>
-      <td><div class="chips">${f.where.map(w => `<span class="chip">${esc(w.host)}:${esc(w.user)}</span>`).join("")}</div></td>
-      <td><div class="actions"><button class="danger small" data-remove="${i}">${esc(t("ui.keys.remove"))}</button></div></td>
+      <td>${whereHTML(f.where)}</td>
+      <td><div class="actions">${f.removed
+        ? `<span class="badge ok" title="${esc(t("ui.keys.rm.pending.hint"))}">${esc(t("ui.keys.rm.pending"))}</span>`
+        : `<button class="danger small" data-remove="${i}">${esc(t("ui.keys.remove"))}</button>`}</div></td>
     </tr>`).join("");
   const app = data.app;
   view.innerHTML = `
@@ -1261,15 +1367,44 @@ function deployDialog(key, fleet) {
   });
 }
 
+function groupByHost(where) {
+  const m = new Map();
+  for (const w of where) {
+    if (!m.has(w.host)) m.set(w.host, []);
+    m.get(w.host).push(w);
+  }
+  return m;
+}
+
+function userChip(w) {
+  return w.removed
+    ? `<span class="chip removed" title="${esc(t("ui.keys.rm.pending.hint"))}">${esc(w.user)}</span>`
+    : `<span class="chip">${esc(w.user)}</span>`;
+}
+
+function whereHTML(where) {
+  const groups = groupByHost(where);
+  const rows = [...groups].map(([host, ws]) =>
+    `<div class="use-host"><span class="use-host-name">${esc(host)}</span><span class="chips">${ws.map(userChip).join("")}</span></div>`).join("");
+  return `<div class="meta">${esc(t("ui.keys.where.sum", groups.size, where.length))}</div><div class="use-list">${rows}</div>`;
+}
+
 function removeDialog(fk) {
-  const hosts = [...new Set(fk.where.map(w => w.host))];
-  const users = [...new Set(fk.where.map(w => w.user))];
+  const rows = fk.where.map((w, i) => `
+    <tr class="${w.removed ? "removed" : ""}">
+      <td><input type="checkbox" class="rm-pick" data-i="${i}" ${w.removed ? "" : "checked"} aria-label="${esc(w.host)}:${esc(w.user)}"></td>
+      <td class="nowrap">${esc(w.host)}</td>
+      <td class="mono nowrap">${esc(w.user)}</td>
+      <td class="meta">${w.removed ? esc(t("ui.keys.rm.pending")) : ""}</td>
+    </tr>`).join("");
   dialog.innerHTML = `
     <div class="dlg">
       <h2>${esc(t("ui.keys.rm.title"))}</h2>
-      <p>${esc(t("ui.keys.rm.body", fk.label || fk.comment || "", fk.where.length))}</p>
+      <p>${esc(t("ui.keys.rm.body", fk.label || fk.comment || ""))}</p>
       <div class="fp">${esc(fk.fingerprint)}</div>
-      <div class="chips">${fk.where.map(w => `<span class="chip">${esc(w.host)}:${esc(w.user)}</span>`).join("")}</div>
+      <div class="table-wrap"><table class="rm-table"><thead><tr>
+        <th><input type="checkbox" id="rm-all" aria-label="${esc(t("ui.keys.rm.all"))}"></th>
+        <th>Host</th><th>${esc(t("c.user"))}</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
       <label class="check"><input type="checkbox" id="rm-dry" checked>${esc(t("ui.keys.op.dry"))}</label>
       <div id="rm-results"></div>
       <div class="status-line" id="rm-status"></div>
@@ -1278,27 +1413,78 @@ function removeDialog(fk) {
         <button class="danger" id="rm-run">${esc(t("ui.keys.remove"))}</button></div>
     </div>`;
   dialog.showModal();
+  const picks = [...dialog.querySelectorAll(".rm-pick")];
+  const allBox = document.getElementById("rm-all");
+  const runBtn = document.getElementById("rm-run");
+  const selected = () => picks.filter(c => c.checked).map(c => fk.where[Number(c.dataset.i)]);
+  const sync = () => {
+    const n = selected().length;
+    allBox.checked = n === picks.length;
+    allBox.indeterminate = n > 0 && n < picks.length;
+    runBtn.disabled = n === 0;
+    runBtn.textContent = t("ui.keys.rm.run", n);
+  };
+  picks.forEach(c => c.addEventListener("change", sync));
+  allBox.addEventListener("change", () => { picks.forEach(c => { c.checked = allBox.checked; }); sync(); });
+  sync();
   document.getElementById("rm-close").addEventListener("click", () => { dialog.close(); renderKeys(); });
   document.getElementById("rm-run").addEventListener("click", async ev => {
     const btn = ev.currentTarget;
     const dry = document.getElementById("rm-dry").checked;
+    const targets = selected().map(w => ({ host: w.host, user: w.user }));
+    const hosts = [...new Set(targets.map(w => w.host))];
+    if (!targets.length) return;
     try {
-      const res = await busy(btn, () => api("/api/keys/remove", { method: "POST", body: { hosts, users, fingerprint: fk.fingerprint, dry_run: dry } }),
+      const res = await busy(btn, () => api("/api/keys/remove", { method: "POST", body: { targets, fingerprint: fk.fingerprint, dry_run: dry } }),
         document.getElementById("rm-status"), t("ui.busy.connecting", hosts.length));
       document.getElementById("rm-results").innerHTML = resultsHTML(res.results);
+      if (!dry) document.getElementById("rm-status").textContent = t("ui.keys.rm.pending.hint");
       if (!dry && allOK(res.results)) btn.hidden = true;
     } catch (e) { document.getElementById("rm-err").textContent = e.message; }
   });
 }
 
-function appDialog() {
+function appHostRows(list, checked) {
+  return list.map(h => `
+    <tr>
+      <td><input type="checkbox" class="app-pick" value="${esc(h.name)}" ${checked ? "checked" : ""} aria-label="${esc(h.name)}"></td>
+      <td class="nowrap">${esc(h.name)}</td>
+      <td class="meta nowrap">${esc(h.group)}</td>
+      <td class="mono nowrap">${esc(h.user)}</td>
+      <td class="mono nowrap">${esc(h.identity || "")}</td>
+    </tr>`).join("");
+}
+
+function appHostTable(title, list, checked) {
+  if (!list.length) return "";
+  return `<h3 class="app-sec">${esc(title)}</h3>
+    <div class="table-wrap"><table class="rm-table"><thead><tr><th></th><th>Host</th><th>${esc(t("ui.f.group"))}</th>
+      <th>${esc(t("c.user"))}</th><th>${esc(t("ui.keys.app.loginkey"))}</th></tr></thead>
+      <tbody>${appHostRows(list, checked)}</tbody></table></div>`;
+}
+
+async function appDialog() {
+  const status = await api("/api/keys/app-status").catch(() => []);
+  const missing = status.filter(h => h.state === "missing");
+  const unknown = status.filter(h => h.state === "unknown");
+  const installed = status.filter(h => h.state === "installed");
+  const lists = missing.length || unknown.length
+    ? appHostTable(t("ui.keys.app.st.missing", missing.length), missing, true) +
+      appHostTable(t("ui.keys.app.st.unknown", unknown.length), unknown, false)
+    : `<p class="note">${esc(t("ui.keys.app.st.none"))}</p>`;
+  const done = installed.length
+    ? `<details class="app-installed"><summary>${esc(t("ui.keys.app.st.installed", installed.length))}</summary>
+        <div class="chips">${installed.map(h => `<span class="chip">${esc(h.name)}</span>`).join("")}</div></details>`
+    : "";
   dialog.innerHTML = `
     <form id="app-form" class="dlg">
       <h2>${esc(t("ui.keys.app"))}</h2>
       <p class="meta">${esc(t("ui.keys.app.body"))}</p>
-      ${scopePickerHTML()}
+      <p class="meta">${esc(t("ui.keys.app.st.sum", installed.length, status.length))}</p>
+      ${lists}
+      ${done}
       <label class="field">${esc(t("ui.keys.op.from"))}<input type="text" name="from" class="mono-input"></label>
-      <label class="check"><input type="checkbox" name="setdefault">${esc(t("ui.keys.app.setdefault"))}</label>
+      <label class="check"><input type="checkbox" name="setid">${esc(t("ui.keys.app.setid"))}</label>
       <label class="check"><input type="checkbox" name="dry" checked>${esc(t("ui.keys.op.dry"))}</label>
       <div id="app-results"></div>
       <div class="status-line" id="app-status"></div>
@@ -1308,19 +1494,27 @@ function appDialog() {
     </form>`;
   dialog.showModal();
   document.getElementById("app-close").addEventListener("click", () => { dialog.close(); renderKeys(); });
-  const getAppScope = bindScopePicker(document.getElementById("app-form"));
+  const picks = [...dialog.querySelectorAll(".app-pick")];
+  const btn = document.getElementById("app-run");
+  const chosen = () => picks.filter(c => c.checked).map(c => c.value);
+  const sync = () => {
+    const n = chosen().length;
+    btn.disabled = n === 0;
+    btn.textContent = t("ui.keys.app.installn", n);
+  };
+  picks.forEach(c => c.addEventListener("change", sync));
+  sync();
   document.getElementById("app-form").addEventListener("submit", async ev => {
     ev.preventDefault();
     const f = new FormData(ev.target);
-    const scope = getAppScope();
-    if (!scope.groups.length && !scope.hosts.length) { document.getElementById("app-err").textContent = t("ui.scope.required"); return; }
-    const body = { ...scope, from: splitCSV(f.get("from")),
-      set_default: f.get("setdefault") === "on", dry_run: f.get("dry") === "on" };
-    const btn = document.getElementById("app-run");
+    const hosts = chosen();
+    if (!hosts.length) { document.getElementById("app-err").textContent = t("ui.scope.required"); return; }
+    const body = { groups: [], hosts, from: splitCSV(f.get("from")), set_identity: f.get("setid") === "on",
+      dry_run: f.get("dry") === "on" };
     const st = document.getElementById("app-status");
     document.getElementById("app-err").textContent = "";
     try {
-      const res = await busy(btn, () => api("/api/keys/app-init", { method: "POST", body }), st, t("ui.busy.connecting", countHosts(body)));
+      const res = await busy(btn, () => api("/api/keys/app-init", { method: "POST", body }), st, t("ui.busy.connecting", hosts.length));
       document.getElementById("app-results").innerHTML =
         (res.will_create ? `<p class="note">${esc(t(body.dry_run ? "ui.keys.app.willcreate" : "ui.keys.app.created"))}</p>` : "") + resultsHTML(res.results);
       if (!body.dry_run && allOK(res.results)) {

@@ -34,6 +34,7 @@ const (
 type Request struct {
 	Hosts     []inventory.Host
 	Users     []string
+	Targets   map[string][]string
 	NewKey    *keys.Key
 	NewSigner ssh.Signer
 	FromIPs   []string
@@ -69,6 +70,13 @@ func (req *Request) Validate() error {
 			return fmt.Errorf("invalid user name %q", u)
 		}
 	}
+	for _, users := range req.Targets {
+		for _, u := range users {
+			if !userRe.MatchString(u) {
+				return fmt.Errorf("invalid user name %q", u)
+			}
+		}
+	}
 	for _, ip := range req.FromIPs {
 		if net.ParseIP(ip) == nil {
 			if _, _, err := net.ParseCIDR(ip); err != nil {
@@ -83,6 +91,9 @@ func (req *Request) Validate() error {
 }
 
 func (req *Request) usersFor(h inventory.Host) []string {
+	if req.Targets != nil {
+		return req.Targets[h.Name]
+	}
 	if len(req.Users) == 0 {
 		return []string{h.User}
 	}
